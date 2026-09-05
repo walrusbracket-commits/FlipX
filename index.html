@@ -118,18 +118,32 @@
       gap: 3px;
     }
 
-    .tile {
-      display: grid;
-      place-items: center;
-      border: 1px solid #4e627e;
-      border-radius: 0.35rem;
-      background: #eaf1fa;
-      color: #172130;
-      font-size: clamp(0.95rem, 4vw, 1.45rem);
-      font-weight: 800;
-      text-transform: uppercase;
-      user-select: none;
-    }
+   .tile {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #4e627e;
+  border-radius: 0.35rem;
+  cursor: default;
+  font: inherit;
+  font-size: clamp(0.95rem, 4vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.tile--a {
+  background: #d9e9ff;
+  color: #10243d;
+  border-color: #6488b6;
+}
+
+.tile--b {
+  background: #ffe7ad;
+  color: #3c2806;
+  border-color: #b58936;
+}
 
     .debug-heading {
       margin: 0 0 0.65rem;
