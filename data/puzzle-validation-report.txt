@@ -1,0 +1,10 @@
+FlipX puzzle validation report
+===============================
+Dictionary entries loaded: 18437
+Input records: 2000
+Verified records: 1476
+Rejected records: 524
+
+Rejection counts:
+- unknown dictionary slot: 524
+- null crossing: 109
