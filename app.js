@@ -3,6 +3,7 @@
 const PUZZLE_FILE = "./data/uniquepuzzles-verified.txt";
 const RECORD_LENGTH = 42;
 const ANSWER_LENGTH = 7;
+const SCRAMBLE_PAIR_COUNT = 6;
 
 const statusElement = document.querySelector("#status");
 const boardAElement = document.querySelector("#board-a");
@@ -69,7 +70,7 @@ function makeBoardCells(puzzle) {
   function addLetter(row, column, letter) {
     /*
       "_" means that optional end extension is absent, so it does not
-      create a tile.
+      create a visible physical tile.
     */
     if (letter === "_") {
       return;
@@ -88,13 +89,14 @@ function makeBoardCells(puzzle) {
   }
 
   /*
-    The central FlipX lattice crosses at source positions 2, 4 and 6.
-    In JavaScript's zero-based coordinates, that is rows/columns 1, 3, 5.
+    FlipX's main lattice crosses at source positions 2, 4 and 6.
+    Zero-based JavaScript coordinates: 1, 3 and 5.
 
-    Across words: rows 1, 3, 5.
-    Down words: columns 1, 3, 5.
+    Across answers use rows 1, 3 and 5.
+    Down answers use columns 1, 3 and 5.
 
-    Positions 0 and 6 are optional word extensions. "_" means no tile.
+    Source positions 0 and 6 are optional extensions. A "_" means
+    that no tile exists at that outer coordinate.
   */
   const acrossWords = [
     { word: puzzle.across1, row: 1 },
@@ -150,8 +152,78 @@ function createGame(puzzleA, puzzleB) {
   return {
     puzzleA,
     puzzleB,
-    tiles
+    tiles,
+    scramblePairs: 0
   };
+}
+
+function shuffledCopy(items) {
+  const copy = [...items];
+
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+
+    [copy[index], copy[randomIndex]] = [
+      copy[randomIndex],
+      copy[index]
+    ];
+  }
+
+  return copy;
+}
+
+function swapTilePositions(firstTile, secondTile) {
+  const firstPosition = { ...firstTile.position };
+
+  firstTile.position = { ...secondTile.position };
+  secondTile.position = firstPosition;
+}
+
+function scrambleGame() {
+  const tilesAByCoordinate = new Map();
+  const tilesBByCoordinate = new Map();
+
+  for (const tile of game.tiles) {
+    const key = `${tile.position.row},${tile.position.column}`;
+
+    if (tile.position.boardId === "A") {
+      tilesAByCoordinate.set(key, tile);
+    } else {
+      tilesBByCoordinate.set(key, tile);
+    }
+  }
+
+  /*
+    A coordinate is eligible only if each board has a physical tile at
+    exactly that row and column.  A selected coordinate swaps A↔B while
+    retaining the coordinate.
+  */
+  const matchingCoordinates = [...tilesAByCoordinate.keys()].filter(key =>
+    tilesBByCoordinate.has(key)
+  );
+
+  const pairCount = Math.min(
+    SCRAMBLE_PAIR_COUNT,
+    matchingCoordinates.length
+  );
+
+  if (pairCount === 0) {
+    throw new Error("The two boards have no matching tile positions to swap.");
+  }
+
+  const selectedCoordinates = shuffledCopy(matchingCoordinates).slice(
+    0,
+    pairCount
+  );
+
+  for (const key of selectedCoordinates) {
+    const tileA = tilesAByCoordinate.get(key);
+    const tileB = tilesBByCoordinate.get(key);
+
+    swapTilePositions(tileA, tileB);
+  }
+
+  game.scramblePairs = pairCount;
 }
 
 function createBoardTile(tile) {
@@ -202,17 +274,18 @@ function displayTwoPuzzles() {
     const puzzleB = splitPuzzleRecord(recordB);
 
     game = createGame(puzzleA, puzzleB);
-
+    scrambleGame();
     renderGame();
 
     renderDebugSlots(puzzleAElement, puzzleA);
     renderDebugSlots(puzzleBElement, puzzleB);
 
-    const tileCount = game.tiles.length;
+    const totalTiles = game.tiles.length;
+    const movedTiles = game.scramblePairs * 2;
 
     statusElement.textContent =
-      `Loaded two different records from ${puzzles.length.toLocaleString("en-GB")} verified puzzles ` +
-      `(${tileCount} physical tiles).`;
+      `Loaded two puzzles and scrambled ${game.scramblePairs} tile pairs ` +
+      `(${movedTiles} of ${totalTiles} physical tiles moved).`;
   } catch (error) {
     console.error(error);
     boardAElement.replaceChildren();
@@ -237,7 +310,9 @@ async function loadPuzzles() {
       .filter(line => line.length === RECORD_LENGTH);
 
     if (puzzles.length < 2) {
-      throw new Error("At least two valid 42-character puzzle records are required.");
+      throw new Error(
+        "At least two valid 42-character puzzle records are required."
+      );
     }
 
     displayTwoPuzzles();
