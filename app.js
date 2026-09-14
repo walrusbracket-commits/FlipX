@@ -10,15 +10,12 @@ const SCRAMBLE_PAIR_COUNT = 2;
 
 const statusElement = document.querySelector("#status");
 const moveCountElement = document.querySelector("#move-count");
-const validationElement = document.querySelector("#validation");
-const validationSummaryElement = document.querySelector("#validation-summary");
-const validationDetailsElement = document.querySelector("#validation-details");
-
 const boardAElement = document.querySelector("#board-a");
 const boardBElement = document.querySelector("#board-b");
-const puzzleAElement = document.querySelector("#puzzle-a");
-const puzzleBElement = document.querySelector("#puzzle-b");
 const newPuzzleButton = document.querySelector("#new-puzzle");
+const winDialog = document.querySelector("#win-dialog");
+const winMessageElement = document.querySelector("#win-message");
+const playAgainButton = document.querySelector("#play-again");
 
 let puzzles = [];
 let dictionary = new Set();
@@ -55,39 +52,6 @@ function splitPuzzleRecord(record) {
   };
 }
 
-function createPuzzleEntry(label, value) {
-  const entry = document.createElement("div");
-  entry.className = "entry";
-
-  const labelElement = document.createElement("span");
-  labelElement.className = "label";
-  labelElement.textContent = label;
-
-  const valueElement = document.createElement("span");
-  valueElement.textContent = value;
-
-  entry.append(labelElement, valueElement);
-  return entry;
-}
-
-function renderDebugSlots(puzzleElement, puzzle) {
-  puzzleElement.replaceChildren(
-    createPuzzleEntry("1A:", puzzle.across1),
-    createPuzzleEntry("2A:", puzzle.across2),
-    createPuzzleEntry("3A:", puzzle.across3),
-    createPuzzleEntry("1D:", puzzle.down1),
-    createPuzzleEntry("2D:", puzzle.down2),
-    createPuzzleEntry("3D:", puzzle.down3)
-  );
-}
-
-/*
-  Build the physical tile list for a solved source grid.
-
-  "_" represents a Null optional extension, so it creates no tile.
-  The 5×5 core crossings occur at source positions 2, 4 and 6:
-  zero-based indices / board coordinates 1, 3 and 5.
-*/
 function makeBoardCells(puzzle) {
   const cells = new Map();
 
@@ -186,8 +150,6 @@ function createGame(puzzleA, puzzleB) {
   }
 
   return {
-    puzzleA,
-    puzzleB,
     boards: {
       A: boardA,
       B: boardB
@@ -214,14 +176,6 @@ function shuffledCopy(items) {
   return copy;
 }
 
-/*
-  Exchange the two occupants at exactly the same coordinate.
-  Each occupant can be either a tile or null.
-
-  A tile ↔ null swap is a real move.
-  A null ↔ null swap changes nothing and cannot be initiated by a
-  player because null positions are never rendered as buttons.
-*/
 function swapCoordinate(boardId, row, column) {
   const oppositeBoardId = getOppositeBoardId(boardId);
   const key = coordinateKey(row, column);
@@ -286,13 +240,6 @@ function scrambleGame() {
   game.scramblePairs = pairCount;
 }
 
-/*
-  Read one live 7-character entry from a board map.
-
-  A null location becomes "_". Because FlipX Nulls only occur at
-  optional first/last letter positions, removing underscores gives the
-  actual candidate dictionary word.
-*/
 function readAcrossWord(boardId, row) {
   let word = "";
 
@@ -317,12 +264,12 @@ function readDownWord(boardId, column) {
 
 function getCurrentBoardWords(boardId) {
   return [
-    { label: "1A", raw: readAcrossWord(boardId, 1) },
-    { label: "2A", raw: readAcrossWord(boardId, 3) },
-    { label: "3A", raw: readAcrossWord(boardId, 5) },
-    { label: "1D", raw: readDownWord(boardId, 1) },
-    { label: "2D", raw: readDownWord(boardId, 3) },
-    { label: "3D", raw: readDownWord(boardId, 5) }
+    readAcrossWord(boardId, 1),
+    readAcrossWord(boardId, 3),
+    readAcrossWord(boardId, 5),
+    readDownWord(boardId, 1),
+    readDownWord(boardId, 3),
+    readDownWord(boardId, 5)
   ];
 }
 
@@ -330,66 +277,20 @@ function normaliseWord(rawWord) {
   return rawWord.replaceAll("_", "").toLowerCase();
 }
 
-function validateCurrentBoards() {
-  const results = [];
-
+function isGameSolved() {
   for (const boardId of ["A", "B"]) {
     const words = getCurrentBoardWords(boardId);
 
-    for (const word of words) {
-      const candidate = normaliseWord(word.raw);
+    for (const rawWord of words) {
+      const candidate = normaliseWord(rawWord);
 
-      results.push({
-        boardId,
-        label: word.label,
-        raw: word.raw,
-        candidate,
-        valid: candidate.length > 0 && dictionary.has(candidate)
-      });
+      if (candidate.length === 0 || !dictionary.has(candidate)) {
+        return false;
+      }
     }
   }
 
-  return results;
-}
-
-function renderValidation() {
-  const results = validateCurrentBoards();
-  const validCount = results.filter(result => result.valid).length;
-  const validA = results.filter(
-    result => result.boardId === "A" && result.valid
-  ).length;
-  const validB = results.filter(
-    result => result.boardId === "B" && result.valid
-  ).length;
-
-  const isSolved = validCount === 12;
-  game.solved = isSolved;
-
-  validationElement.classList.toggle("is-solved", isSolved);
-
-  validationSummaryElement.textContent = isSolved
-    ? "Solved! All 12 current words are in the dictionary."
-    : `Valid words: ${validCount} / 12 — Grid A: ${validA} / 6, Grid B: ${validB} / 6`;
-
-  const rows = results.map(result => {
-    const item = document.createElement("li");
-    item.className = "validation-word";
-
-    if (result.valid) {
-      item.classList.add("is-valid");
-    }
-
-    const marker = result.valid ? "✓" : "×";
-    item.textContent =
-      `Grid ${result.boardId} ${result.label}: ` +
-      `${result.raw} → ${result.candidate} ${marker}`;
-
-    return item;
-  });
-
-  validationDetailsElement.replaceChildren(...rows);
-
-  return isSolved;
+  return true;
 }
 
 function createBoardTile(tile) {
@@ -432,6 +333,16 @@ function renderGame() {
   moveCountElement.textContent = `Tiles moved: ${game.moves}`;
 }
 
+function showWinDialog() {
+  winMessageElement.textContent =
+    `You made two valid grids in ${game.moves} ` +
+    `${game.moves === 1 ? "move" : "moves"}.`;
+
+  if (!winDialog.open) {
+    winDialog.showModal();
+  }
+}
+
 function handleTileClick(event) {
   if (!game || game.solved) {
     return;
@@ -453,23 +364,24 @@ function handleTileClick(event) {
   game.moves += 1;
   renderGame();
 
-  const isSolved = renderValidation();
-
-  if (isSolved) {
-    statusElement.textContent =
-      `Well done — both grids now contain valid words in ${game.moves} moves.`;
+  if (isGameSolved()) {
+    game.solved = true;
+    statusElement.textContent = "Both grids contain valid words.";
+    showWinDialog();
   } else {
     statusElement.textContent =
-      `Tiles moved: ${game.moves}. ` +
       "Click any visible tile to move it to the matching position in the other grid.";
   }
 }
 
 function displayTwoPuzzles() {
-  if (puzzles.length < 2) {
-    statusElement.textContent =
-      "Error: At least two puzzle records are required.";
+  if (puzzles.length < 2 || dictionary.size === 0) {
+    statusElement.textContent = "Error: Puzzle data is not ready.";
     return;
+  }
+
+  if (winDialog.open) {
+    winDialog.close();
   }
 
   try {
@@ -479,26 +391,21 @@ function displayTwoPuzzles() {
 
     game = createGame(puzzleA, puzzleB);
     scrambleGame();
-
-    renderDebugSlots(puzzleAElement, puzzleA);
-    renderDebugSlots(puzzleBElement, puzzleB);
     renderGame();
 
-    const isSolved = renderValidation();
-    const puzzleCount = puzzles.length.toLocaleString("en-GB");
-    const dictionaryCount = dictionary.size.toLocaleString("en-GB");
+    if (isGameSolved()) {
+      game.solved = true;
+      statusElement.textContent = "This puzzle pair loaded already solved.";
+      showWinDialog();
+      return;
+    }
 
-    statusElement.textContent = isSolved
-      ? "This puzzle pair loaded already solved. Press New puzzle."
-      : `Loaded two puzzles from ${puzzleCount} records and ` +
-        `${dictionaryCount} unique dictionary words. ` +
-        `Scrambled ${game.scramblePairs} positions.`;
+    statusElement.textContent =
+      "Click any visible tile to move it to the matching position in the other grid.";
   } catch (error) {
     console.error(error);
     boardAElement.replaceChildren();
     boardBElement.replaceChildren();
-    validationSummaryElement.textContent = `Error: ${error.message}`;
-    validationDetailsElement.replaceChildren();
     statusElement.textContent = `Error: ${error.message}`;
   }
 }
@@ -549,12 +456,11 @@ async function loadGameData() {
     displayTwoPuzzles();
   } catch (error) {
     console.error(error);
-    validationSummaryElement.textContent = `Error: ${error.message}`;
-    validationDetailsElement.replaceChildren();
     statusElement.textContent = `Error: ${error.message}`;
   }
 }
 
 newPuzzleButton.addEventListener("click", displayTwoPuzzles);
+playAgainButton.addEventListener("click", displayTwoPuzzles);
 
 loadGameData();

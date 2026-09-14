@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FlipX — Validation Test</title>
+  <title>FlipX</title>
 
   <style>
     :root {
@@ -81,51 +81,9 @@
       font-weight: 700;
     }
 
-    #validation {
-      margin: 1rem 0 0;
-      padding: 0.9rem 1rem;
-      border: 1px solid #40516a;
-      border-radius: 0.7rem;
-      background: #111924;
-      color: #dce9f8;
-    }
-
-    #validation.is-solved {
-      border-color: #53c99d;
-      background: #123629;
-      color: #d6ffef;
-    }
-
-    #validation-title {
-      margin: 0 0 0.35rem;
-      font-size: 1rem;
-    }
-
-    #validation-summary {
-      margin: 0;
-      font-weight: 700;
-    }
-
-    #validation-details {
-      display: grid;
-      gap: 0.35rem;
-      margin: 0.7rem 0 0;
-      padding: 0;
-      list-style: none;
-      font: 600 0.92rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    }
-
-    .validation-word {
-      color: #ffb6b6;
-    }
-
-    .validation-word.is-valid {
-      color: #79d9ba;
-    }
-
     #status {
       min-height: 1.5rem;
-      margin: 1rem 0;
+      margin: 1rem 0 0;
       color: #aebed1;
     }
 
@@ -164,7 +122,7 @@
     .board-wrap {
       display: grid;
       place-items: center;
-      margin: 1.1rem 0 1.3rem;
+      margin: 1.1rem 0 0.25rem;
       overflow-x: auto;
       padding: 0.25rem;
     }
@@ -222,30 +180,42 @@
       border-color: #b58936;
     }
 
-    .debug-heading {
-      margin: 0 0 0.65rem;
-      color: #aebed1;
-      font-size: 0.95rem;
+    dialog {
+      width: min(28rem, calc(100% - 2rem));
+      padding: 0;
+      border: 1px solid #5ad2a9;
+      border-radius: 1rem;
+      background: #14372c;
+      color: #e4fff4;
+      box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 55%);
     }
 
-    .puzzle-debug {
-      display: grid;
-      gap: 0.5rem;
+    dialog::backdrop {
+      background: rgb(0 0 0 / 64%);
+    }
+
+    .win-dialog-content {
+      padding: 1.75rem;
+      text-align: center;
+    }
+
+    .win-dialog-content h2 {
       margin: 0;
-      padding: 0.9rem;
-      border-radius: 0.7rem;
-      background: #0b1119;
-      font: 600 1rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 2rem;
     }
 
-    .entry {
-      display: grid;
-      grid-template-columns: 2.75rem 1fr;
-      gap: 0.75rem;
+    .win-dialog-content p {
+      margin: 0.8rem 0 1.4rem;
+      color: #c8f7e4;
     }
 
-    .label {
-      color: #79d9ba;
+    .win-dialog-content button {
+      background: #54bc91;
+      color: #092117;
+    }
+
+    .win-dialog-content button:hover {
+      background: #79ddb3;
     }
 
     @media (max-width: 38rem) {
@@ -273,18 +243,12 @@
 <body>
   <main>
     <h1>FlipX</h1>
-    <p class="subtitle">Dictionary validation test</p>
+    <p class="subtitle">Make both grids into valid words.</p>
 
     <div class="controls">
       <button id="new-puzzle" type="button">New puzzle</button>
       <p id="move-count" aria-live="polite">Tiles moved: 0</p>
     </div>
-
-    <section id="validation" aria-live="polite" aria-label="Word validation">
-      <h2 id="validation-title">Current word check</h2>
-      <p id="validation-summary">Loading dictionary…</p>
-      <ul id="validation-details"></ul>
-    </section>
 
     <p id="status" role="status">Loading puzzle data…</p>
 
@@ -300,9 +264,6 @@
             aria-label="Grid A crossword board"
           ></div>
         </div>
-
-        <h3 class="debug-heading">Original source slots — temporary debug view</h3>
-        <div id="puzzle-a" class="puzzle-debug" aria-live="polite"></div>
       </article>
 
       <article class="board-card">
@@ -316,12 +277,17 @@
             aria-label="Grid B crossword board"
           ></div>
         </div>
-
-        <h3 class="debug-heading">Original source slots — temporary debug view</h3>
-        <div id="puzzle-b" class="puzzle-debug" aria-live="polite"></div>
       </article>
     </section>
   </main>
+
+  <dialog id="win-dialog" aria-labelledby="win-title">
+    <div class="win-dialog-content">
+      <h2 id="win-title">Well done!</h2>
+      <p id="win-message">You made two valid grids.</p>
+      <button id="play-again" type="button" autofocus>Play another puzzle</button>
+    </div>
+  </dialog>
 
   <script src="./app.js"></script>
 </body>
