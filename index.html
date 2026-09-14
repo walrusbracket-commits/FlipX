@@ -122,6 +122,63 @@
       color: #c8f7e4;
     }
 
+    #share-panel {
+  display: none;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgb(200 247 228 / 28%);
+}
+
+#share-panel.is-visible {
+  display: block;
+}
+
+#share-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+#share-panel p {
+  margin: 0.35rem 0 0.75rem;
+}
+
+#share-text {
+  display: block;
+  width: 100%;
+  min-height: 6.5rem;
+  margin: 0;
+  padding: 0.7rem;
+  border: 1px solid #70c9a8;
+  border-radius: 0.5rem;
+  resize: vertical;
+  background: #0b2119;
+  color: #e4fff4;
+  font: 600 0.9rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.7rem;
+  margin-top: 0.75rem;
+}
+
+.share-actions button {
+  background: #54bc91;
+  color: #092117;
+}
+
+.share-actions button:hover {
+  background: #79ddb3;
+}
+
+#copy-status {
+  min-height: 1.25rem;
+  margin: 0.65rem 0 0;
+  color: #c8f7e4;
+  font-size: 0.9rem;
+}
     #boards {
       display: flex;
       flex-wrap: wrap;
@@ -322,7 +379,25 @@
     <section id="celebration" aria-live="assertive" aria-label="Puzzle completed">
       <h2>Well done!</h2>
       <p id="celebration-message">You made two valid grids.</p>
-    </section>
+
+        <div id="share-panel">
+        <h3>Tell all my friends!</h3>
+      <p>Share your result, or copy it to paste into a message or social post.</p>
+
+    <textarea
+      id="share-text"
+      readonly
+      aria-label="Your FlipX result text"
+    ></textarea>
+
+    <div class="share-actions">
+      <button id="share-result" type="button">Share</button>
+      <button id="copy-result" type="button">Copy result</button>
+    </div>
+
+    <p id="copy-status" role="status"></p>
+  </div>
+</section>
 
     <section id="boards" aria-label="Two FlipX puzzle boards">
       <article class="board-card">

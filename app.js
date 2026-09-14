@@ -17,6 +17,11 @@ const boardBElement = document.querySelector("#board-b");
 const newPuzzleButton = document.querySelector("#new-puzzle");
 const celebrationElement = document.querySelector("#celebration");
 const celebrationMessageElement = document.querySelector("#celebration-message");
+const sharePanelElement = document.querySelector("#share-panel");
+const shareTextElement = document.querySelector("#share-text");
+const shareResultButton = document.querySelector("#share-result");
+const copyResultButton = document.querySelector("#copy-result");
+const copyStatusElement = document.querySelector("#copy-status");
 const animationLayer = document.querySelector("#animation-layer");
 
 let puzzles = [];
@@ -495,7 +500,20 @@ function clearCelebration() {
   }
 
   celebrationElement.classList.remove("is-visible");
+  sharePanelElement.classList.remove("is-visible");
   newPuzzleButton.classList.remove("is-ready");
+  shareTextElement.value = "";
+  copyStatusElement.textContent = "";
+}
+
+function makeShareText() {
+  const moveWord = game.moves === 1 ? "move" : "moves";
+
+  return [
+    `I solved FlipX in ${game.moves} ${moveWord}!`,
+    "",
+    "Can you make both grids into valid words?"
+  ].join("\n");
 }
 
 function showCelebration() {
@@ -504,7 +522,11 @@ function showCelebration() {
     `${game.moves === 1 ? "move" : "moves"}. ` +
     "Choose New puzzle when you are ready.";
 
+  shareTextElement.value = makeShareText();
+  copyStatusElement.textContent = "";
+
   celebrationElement.classList.add("is-visible");
+  sharePanelElement.classList.add("is-visible");
   newPuzzleButton.classList.add("is-ready");
 
   if (celebrationTimerId !== null) {
@@ -513,8 +535,62 @@ function showCelebration() {
 
   celebrationTimerId = window.setTimeout(() => {
     celebrationElement.classList.remove("is-visible");
+    sharePanelElement.classList.remove("is-visible");
     celebrationTimerId = null;
   }, CELEBRATION_DURATION_MS);
+}
+
+async function copyShareText() {
+  const text = shareTextElement.value;
+
+  if (!text) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    copyStatusElement.textContent = "Result copied to your clipboard.";
+  } catch (error) {
+    shareTextElement.focus();
+    shareTextElement.select();
+    copyStatusElement.textContent =
+      "Your result is selected. Use Ctrl+C (or your device’s Copy command).";
+  }
+}
+
+async function shareResult() {
+  const text = shareTextElement.value;
+
+  if (!text) {
+    return;
+  }
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "FlipX",
+        text
+      });
+
+      copyStatusElement.textContent = "Thanks for sharing FlipX!";
+      return;
+    } catch (error) {
+      /*
+        Cancelling the system share sheet is normal. Do not present it
+        as an error; leave the copy option available.
+      */
+      if (error.name === "AbortError") {
+        copyStatusElement.textContent = "Sharing cancelled.";
+      } else {
+        copyStatusElement.textContent =
+          "Sharing was unavailable. Use Copy result instead.";
+      }
+
+      return;
+    }
+  }
+
+  await copyShareText();
 }
 
 async function handleTileClick(event) {
@@ -654,5 +730,7 @@ async function loadGameData() {
 }
 
 newPuzzleButton.addEventListener("click", displayTwoPuzzles);
+copyResultButton.addEventListener("click", copyShareText);
+shareResultButton.addEventListener("click", shareResult);
 
 loadGameData();
