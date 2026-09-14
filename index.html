@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FlipX — Play Test</title>
+  <title>FlipX — Validation Test</title>
 
   <style>
     :root {
@@ -79,6 +79,48 @@
       background: #111924;
       color: #dce9f8;
       font-weight: 700;
+    }
+
+    #validation {
+      margin: 1rem 0 0;
+      padding: 0.9rem 1rem;
+      border: 1px solid #40516a;
+      border-radius: 0.7rem;
+      background: #111924;
+      color: #dce9f8;
+    }
+
+    #validation.is-solved {
+      border-color: #53c99d;
+      background: #123629;
+      color: #d6ffef;
+    }
+
+    #validation-title {
+      margin: 0 0 0.35rem;
+      font-size: 1rem;
+    }
+
+    #validation-summary {
+      margin: 0;
+      font-weight: 700;
+    }
+
+    #validation-details {
+      display: grid;
+      gap: 0.35rem;
+      margin: 0.7rem 0 0;
+      padding: 0;
+      list-style: none;
+      font: 600 0.92rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .validation-word {
+      color: #ffb6b6;
+    }
+
+    .validation-word.is-valid {
+      color: #79d9ba;
     }
 
     #status {
@@ -231,14 +273,20 @@
 <body>
   <main>
     <h1>FlipX</h1>
-    <p class="subtitle">One-click tile-swap test</p>
+    <p class="subtitle">Dictionary validation test</p>
 
     <div class="controls">
       <button id="new-puzzle" type="button">New puzzle</button>
       <p id="move-count" aria-live="polite">Tiles moved: 0</p>
     </div>
 
-    <p id="status" role="status">Loading puzzles…</p>
+    <section id="validation" aria-live="polite" aria-label="Word validation">
+      <h2 id="validation-title">Current word check</h2>
+      <p id="validation-summary">Loading dictionary…</p>
+      <ul id="validation-details"></ul>
+    </section>
+
+    <p id="status" role="status">Loading puzzle data…</p>
 
     <section id="boards" aria-label="Two FlipX puzzle boards">
       <article class="board-card">
@@ -253,7 +301,7 @@
           ></div>
         </div>
 
-        <h3 class="debug-heading">Source slots — temporary debug view</h3>
+        <h3 class="debug-heading">Original source slots — temporary debug view</h3>
         <div id="puzzle-a" class="puzzle-debug" aria-live="polite"></div>
       </article>
 
@@ -269,7 +317,7 @@
           ></div>
         </div>
 
-        <h3 class="debug-heading">Source slots — temporary debug view</h3>
+        <h3 class="debug-heading">Original source slots — temporary debug view</h3>
         <div id="puzzle-b" class="puzzle-debug" aria-live="polite"></div>
       </article>
     </section>

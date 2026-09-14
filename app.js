@@ -1,13 +1,19 @@
 "use strict";
 
 const PUZZLE_FILE = "./data/uniquepuzzles-verified.txt";
+const DICTIONARY_FILE = "./data/dictionary.txt";
+
 const RECORD_LENGTH = 42;
 const ANSWER_LENGTH = 7;
 const BOARD_SIZE = 7;
-const SCRAMBLE_PAIR_COUNT = 4;
+const SCRAMBLE_PAIR_COUNT = 2;
 
 const statusElement = document.querySelector("#status");
 const moveCountElement = document.querySelector("#move-count");
+const validationElement = document.querySelector("#validation");
+const validationSummaryElement = document.querySelector("#validation-summary");
+const validationDetailsElement = document.querySelector("#validation-details");
+
 const boardAElement = document.querySelector("#board-a");
 const boardBElement = document.querySelector("#board-b");
 const puzzleAElement = document.querySelector("#puzzle-a");
@@ -15,10 +21,15 @@ const puzzleBElement = document.querySelector("#puzzle-b");
 const newPuzzleButton = document.querySelector("#new-puzzle");
 
 let puzzles = [];
+let dictionary = new Set();
 let game = null;
 
 function coordinateKey(row, column) {
   return `${row},${column}`;
+}
+
+function getOppositeBoardId(boardId) {
+  return boardId === "A" ? "B" : "A";
 }
 
 function selectTwoDifferentPuzzles() {
@@ -71,13 +82,11 @@ function renderDebugSlots(puzzleElement, puzzle) {
 }
 
 /*
-  Returns every physical tile coordinate in one solved puzzle.
+  Build the physical tile list for a solved source grid.
 
-  The source words are always seven characters wide:
-  positions 2, 4 and 6 make the 5×5 crossed core;
-  positions 1 and 7 are optional outer extensions.
-
-  "_" is a Null: it creates no tile at that location.
+  "_" represents a Null optional extension, so it creates no tile.
+  The 5×5 core crossings occur at source positions 2, 4 and 6:
+  zero-based indices / board coordinates 1, 3 and 5.
 */
 function makeBoardCells(puzzle) {
   const cells = new Map();
@@ -144,14 +153,6 @@ function makeTile(boardId, cell) {
   };
 }
 
-/*
-  Every 7×7 coordinate is represented internally on both boards.
-  Its value is either a tile object or null.
-
-  This is the crucial distinction:
-  Null locations are stored for movement logic, but never rendered
-  as buttons and therefore can never be clicked.
-*/
 function createBoardState() {
   const positions = new Map();
 
@@ -193,7 +194,8 @@ function createGame(puzzleA, puzzleB) {
     },
     tiles: [...tilesA, ...tilesB],
     scramblePairs: 0,
-    moves: 0
+    moves: 0,
+    solved: false
   };
 }
 
@@ -212,18 +214,13 @@ function shuffledCopy(items) {
   return copy;
 }
 
-function getOppositeBoardId(boardId) {
-  return boardId === "A" ? "B" : "A";
-}
-
 /*
-  Swap the two occupants at one matching coordinate.
+  Exchange the two occupants at exactly the same coordinate.
+  Each occupant can be either a tile or null.
 
-  Either occupant may be null:
-  tile ↔ tile  = both cross over
-  tile ↔ null  = clicked tile moves alone
-  null ↔ null  = technically unchanged, but cannot be clicked because
-                 neither side renders a tile button.
+  A tile ↔ null swap is a real move.
+  A null ↔ null swap changes nothing and cannot be initiated by a
+  player because null positions are never rendered as buttons.
 */
 function swapCoordinate(boardId, row, column) {
   const oppositeBoardId = getOppositeBoardId(boardId);
@@ -255,21 +252,14 @@ function swapCoordinate(boardId, row, column) {
   }
 }
 
-/*
-  A scramble chooses any coordinate containing at least one physical tile.
-  This means it faithfully includes tile ↔ Null exchanges, just as a
-  player move does. Null ↔ Null coordinates are excluded.
-*/
 function scrambleGame() {
   const eligibleCoordinates = [];
 
   for (let row = 0; row < BOARD_SIZE; row += 1) {
     for (let column = 0; column < BOARD_SIZE; column += 1) {
       const key = coordinateKey(row, column);
-      const occupantA = game.boards.A.get(key);
-      const occupantB = game.boards.B.get(key);
 
-      if (occupantA || occupantB) {
+      if (game.boards.A.get(key) || game.boards.B.get(key)) {
         eligibleCoordinates.push({ row, column });
       }
     }
@@ -296,6 +286,112 @@ function scrambleGame() {
   game.scramblePairs = pairCount;
 }
 
+/*
+  Read one live 7-character entry from a board map.
+
+  A null location becomes "_". Because FlipX Nulls only occur at
+  optional first/last letter positions, removing underscores gives the
+  actual candidate dictionary word.
+*/
+function readAcrossWord(boardId, row) {
+  let word = "";
+
+  for (let column = 0; column < ANSWER_LENGTH; column += 1) {
+    const tile = game.boards[boardId].get(coordinateKey(row, column));
+    word += tile ? tile.letter : "_";
+  }
+
+  return word;
+}
+
+function readDownWord(boardId, column) {
+  let word = "";
+
+  for (let row = 0; row < ANSWER_LENGTH; row += 1) {
+    const tile = game.boards[boardId].get(coordinateKey(row, column));
+    word += tile ? tile.letter : "_";
+  }
+
+  return word;
+}
+
+function getCurrentBoardWords(boardId) {
+  return [
+    { label: "1A", raw: readAcrossWord(boardId, 1) },
+    { label: "2A", raw: readAcrossWord(boardId, 3) },
+    { label: "3A", raw: readAcrossWord(boardId, 5) },
+    { label: "1D", raw: readDownWord(boardId, 1) },
+    { label: "2D", raw: readDownWord(boardId, 3) },
+    { label: "3D", raw: readDownWord(boardId, 5) }
+  ];
+}
+
+function normaliseWord(rawWord) {
+  return rawWord.replaceAll("_", "").toLowerCase();
+}
+
+function validateCurrentBoards() {
+  const results = [];
+
+  for (const boardId of ["A", "B"]) {
+    const words = getCurrentBoardWords(boardId);
+
+    for (const word of words) {
+      const candidate = normaliseWord(word.raw);
+
+      results.push({
+        boardId,
+        label: word.label,
+        raw: word.raw,
+        candidate,
+        valid: candidate.length > 0 && dictionary.has(candidate)
+      });
+    }
+  }
+
+  return results;
+}
+
+function renderValidation() {
+  const results = validateCurrentBoards();
+  const validCount = results.filter(result => result.valid).length;
+  const validA = results.filter(
+    result => result.boardId === "A" && result.valid
+  ).length;
+  const validB = results.filter(
+    result => result.boardId === "B" && result.valid
+  ).length;
+
+  const isSolved = validCount === 12;
+  game.solved = isSolved;
+
+  validationElement.classList.toggle("is-solved", isSolved);
+
+  validationSummaryElement.textContent = isSolved
+    ? "Solved! All 12 current words are in the dictionary."
+    : `Valid words: ${validCount} / 12 — Grid A: ${validA} / 6, Grid B: ${validB} / 6`;
+
+  const rows = results.map(result => {
+    const item = document.createElement("li");
+    item.className = "validation-word";
+
+    if (result.valid) {
+      item.classList.add("is-valid");
+    }
+
+    const marker = result.valid ? "✓" : "×";
+    item.textContent =
+      `Grid ${result.boardId} ${result.label}: ` +
+      `${result.raw} → ${result.candidate} ${marker}`;
+
+    return item;
+  });
+
+  validationDetailsElement.replaceChildren(...rows);
+
+  return isSolved;
+}
+
 function createBoardTile(tile) {
   const tileElement = document.createElement("button");
 
@@ -319,15 +415,14 @@ function createBoardTile(tile) {
 }
 
 function renderBoard(boardElement, boardId) {
-  const tiles = [];
+  const tileElements = [];
 
   for (const tile of game.boards[boardId].values()) {
     if (tile) {
-      tiles.push(tile);
+      tileElements.push(createBoardTile(tile));
     }
   }
 
-  const tileElements = tiles.map(createBoardTile);
   boardElement.replaceChildren(...tileElements);
 }
 
@@ -338,6 +433,10 @@ function renderGame() {
 }
 
 function handleTileClick(event) {
+  if (!game || game.solved) {
+    return;
+  }
+
   const tileId = event.currentTarget.dataset.tileId;
   const tile = game.tiles.find(candidate => candidate.id === tileId);
 
@@ -345,10 +444,6 @@ function handleTileClick(event) {
     return;
   }
 
-  /*
-    A rendered button always represents a non-null tile. Therefore a
-    Null↔Null move cannot occur and cannot increase the move counter.
-  */
   swapCoordinate(
     tile.position.boardId,
     tile.position.row,
@@ -358,9 +453,16 @@ function handleTileClick(event) {
   game.moves += 1;
   renderGame();
 
-  statusElement.textContent =
-    `Tiles moved: ${game.moves}. ` +
-    `Click any visible tile to move it to the same position in the other grid.`;
+  const isSolved = renderValidation();
+
+  if (isSolved) {
+    statusElement.textContent =
+      `Well done — both grids now contain valid words in ${game.moves} moves.`;
+  } else {
+    statusElement.textContent =
+      `Tiles moved: ${game.moves}. ` +
+      "Click any visible tile to move it to the matching position in the other grid.";
+  }
 }
 
 function displayTwoPuzzles() {
@@ -382,37 +484,57 @@ function displayTwoPuzzles() {
     renderDebugSlots(puzzleBElement, puzzleB);
     renderGame();
 
-    const totalTiles = game.tiles.length;
-    const movedTiles = game.scramblePairs * 2;
+    const isSolved = renderValidation();
+    const puzzleCount = puzzles.length.toLocaleString("en-GB");
+    const dictionaryCount = dictionary.size.toLocaleString("en-GB");
 
-    statusElement.textContent =
-      `Loaded two puzzles and scrambled ${game.scramblePairs} positions ` +
-      `(${movedTiles} tile movements possible across ${totalTiles} physical tiles). ` +
-      `Click any visible tile to move it.`;
+    statusElement.textContent = isSolved
+      ? "This puzzle pair loaded already solved. Press New puzzle."
+      : `Loaded two puzzles from ${puzzleCount} records and ` +
+        `${dictionaryCount} unique dictionary words. ` +
+        `Scrambled ${game.scramblePairs} positions.`;
   } catch (error) {
     console.error(error);
     boardAElement.replaceChildren();
     boardBElement.replaceChildren();
+    validationSummaryElement.textContent = `Error: ${error.message}`;
+    validationDetailsElement.replaceChildren();
     statusElement.textContent = `Error: ${error.message}`;
   }
 }
 
-async function loadPuzzles() {
+function responseToText(response, fileName) {
+  if (!response.ok) {
+    throw new Error(`Could not load ${fileName}: HTTP ${response.status}`);
+  }
+
+  return response.text();
+}
+
+async function loadGameData() {
   try {
-    const response = await fetch(PUZZLE_FILE);
+    const [puzzleResponse, dictionaryResponse] = await Promise.all([
+      fetch(PUZZLE_FILE),
+      fetch(DICTIONARY_FILE)
+    ]);
 
-    if (!response.ok) {
-      throw new Error(
-        `Could not load puzzle file: HTTP ${response.status}`
-      );
-    }
+    const [puzzleText, dictionaryText] = await Promise.all([
+      responseToText(puzzleResponse, "puzzle file"),
+      responseToText(dictionaryResponse, "dictionary file")
+    ]);
 
-    const text = await response.text();
-
-    puzzles = text
+    puzzles = puzzleText
       .split(/\r?\n/)
       .map(line => line.trim())
       .filter(line => line.length === RECORD_LENGTH);
+
+    dictionary = new Set(
+      dictionaryText
+        .split(/\r?\n/)
+        .map(line => line.trim().toLowerCase())
+        .map(word => word.replaceAll("_", ""))
+        .filter(Boolean)
+    );
 
     if (puzzles.length < 2) {
       throw new Error(
@@ -420,13 +542,19 @@ async function loadPuzzles() {
       );
     }
 
+    if (dictionary.size === 0) {
+      throw new Error("No usable words were found in dictionary.txt.");
+    }
+
     displayTwoPuzzles();
   } catch (error) {
     console.error(error);
+    validationSummaryElement.textContent = `Error: ${error.message}`;
+    validationDetailsElement.replaceChildren();
     statusElement.textContent = `Error: ${error.message}`;
   }
 }
 
 newPuzzleButton.addEventListener("click", displayTwoPuzzles);
 
-loadPuzzles();
+loadGameData();
