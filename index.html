@@ -150,7 +150,7 @@
       line-height: 1;
       text-transform: uppercase;
       user-select: none;
-      transition: transform 120ms ease, filter 120ms ease;
+      transition: transform 120ms ease, filter 120ms ease, opacity 120ms ease;
       touch-action: manipulation;
     }
 
@@ -168,6 +168,11 @@
       outline-offset: 3px;
     }
 
+    .tile.is-flying-origin {
+      opacity: 0;
+      pointer-events: none;
+    }
+
     .tile--a {
       background: #d9e9ff;
       color: #10243d;
@@ -178,6 +183,42 @@
       background: #ffe7ad;
       color: #3c2806;
       border-color: #b58936;
+    }
+
+    /*
+      The overlay contains only temporary moving copies of tiles.
+      pointer-events: none ensures it never intercepts a click.
+    */
+    #animation-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .flying-tile {
+      position: fixed;
+      z-index: 21;
+      display: grid;
+      place-items: center;
+      margin: 0;
+      padding: 0;
+      border: 1px solid #4e627e;
+      border-radius: 0.35rem;
+      font: inherit;
+      font-size: clamp(0.95rem, 4vw, 1.45rem);
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+      user-select: none;
+      pointer-events: none;
+      will-change: transform;
+      box-shadow: 0 0.45rem 1.1rem rgb(0 0 0 / 34%);
+    }
+
+    .flying-tile--front {
+      z-index: 22;
     }
 
     dialog {
@@ -280,6 +321,8 @@
       </article>
     </section>
   </main>
+
+  <div id="animation-layer" aria-hidden="true"></div>
 
   <dialog id="win-dialog" aria-labelledby="win-title">
     <div class="win-dialog-content">
