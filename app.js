@@ -3,9 +3,11 @@
 const PUZZLE_FILE = "./data/uniquepuzzles-verified.txt";
 const RECORD_LENGTH = 42;
 const ANSWER_LENGTH = 7;
-const SCRAMBLE_PAIR_COUNT = 6;
+const BOARD_SIZE = 7;
+const SCRAMBLE_PAIR_COUNT = 4;
 
 const statusElement = document.querySelector("#status");
+const moveCountElement = document.querySelector("#move-count");
 const boardAElement = document.querySelector("#board-a");
 const boardBElement = document.querySelector("#board-b");
 const puzzleAElement = document.querySelector("#puzzle-a");
@@ -14,6 +16,10 @@ const newPuzzleButton = document.querySelector("#new-puzzle");
 
 let puzzles = [];
 let game = null;
+
+function coordinateKey(row, column) {
+  return `${row},${column}`;
+}
 
 function selectTwoDifferentPuzzles() {
   const firstIndex = Math.floor(Math.random() * puzzles.length);
@@ -64,19 +70,24 @@ function renderDebugSlots(puzzleElement, puzzle) {
   );
 }
 
+/*
+  Returns every physical tile coordinate in one solved puzzle.
+
+  The source words are always seven characters wide:
+  positions 2, 4 and 6 make the 5×5 crossed core;
+  positions 1 and 7 are optional outer extensions.
+
+  "_" is a Null: it creates no tile at that location.
+*/
 function makeBoardCells(puzzle) {
   const cells = new Map();
 
   function addLetter(row, column, letter) {
-    /*
-      "_" means that optional end extension is absent, so it does not
-      create a visible physical tile.
-    */
     if (letter === "_") {
       return;
     }
 
-    const key = `${row},${column}`;
+    const key = coordinateKey(row, column);
     const existingCell = cells.get(key);
 
     if (existingCell && existingCell.letter !== letter) {
@@ -88,16 +99,6 @@ function makeBoardCells(puzzle) {
     cells.set(key, { row, column, letter });
   }
 
-  /*
-    FlipX's main lattice crosses at source positions 2, 4 and 6.
-    Zero-based JavaScript coordinates: 1, 3 and 5.
-
-    Across answers use rows 1, 3 and 5.
-    Down answers use columns 1, 3 and 5.
-
-    Source positions 0 and 6 are optional extensions. A "_" means
-    that no tile exists at that outer coordinate.
-  */
   const acrossWords = [
     { word: puzzle.across1, row: 1 },
     { word: puzzle.across2, row: 3 },
@@ -143,17 +144,56 @@ function makeTile(boardId, cell) {
   };
 }
 
+/*
+  Every 7×7 coordinate is represented internally on both boards.
+  Its value is either a tile object or null.
+
+  This is the crucial distinction:
+  Null locations are stored for movement logic, but never rendered
+  as buttons and therefore can never be clicked.
+*/
+function createBoardState() {
+  const positions = new Map();
+
+  for (let row = 0; row < BOARD_SIZE; row += 1) {
+    for (let column = 0; column < BOARD_SIZE; column += 1) {
+      positions.set(coordinateKey(row, column), null);
+    }
+  }
+
+  return positions;
+}
+
+function placeTile(board, tile) {
+  const key = coordinateKey(tile.position.row, tile.position.column);
+  board.set(key, tile);
+}
+
 function createGame(puzzleA, puzzleB) {
-  const tiles = [
-    ...makeBoardCells(puzzleA).map(cell => makeTile("A", cell)),
-    ...makeBoardCells(puzzleB).map(cell => makeTile("B", cell))
-  ];
+  const boardA = createBoardState();
+  const boardB = createBoardState();
+
+  const tilesA = makeBoardCells(puzzleA).map(cell => makeTile("A", cell));
+  const tilesB = makeBoardCells(puzzleB).map(cell => makeTile("B", cell));
+
+  for (const tile of tilesA) {
+    placeTile(boardA, tile);
+  }
+
+  for (const tile of tilesB) {
+    placeTile(boardB, tile);
+  }
 
   return {
     puzzleA,
     puzzleB,
-    tiles,
-    scramblePairs: 0
+    boards: {
+      A: boardA,
+      B: boardB
+    },
+    tiles: [...tilesA, ...tilesB],
+    scramblePairs: 0,
+    moves: 0
   };
 }
 
@@ -172,55 +212,85 @@ function shuffledCopy(items) {
   return copy;
 }
 
-function swapTilePositions(firstTile, secondTile) {
-  const firstPosition = { ...firstTile.position };
-
-  firstTile.position = { ...secondTile.position };
-  secondTile.position = firstPosition;
+function getOppositeBoardId(boardId) {
+  return boardId === "A" ? "B" : "A";
 }
 
+/*
+  Swap the two occupants at one matching coordinate.
+
+  Either occupant may be null:
+  tile ↔ tile  = both cross over
+  tile ↔ null  = clicked tile moves alone
+  null ↔ null  = technically unchanged, but cannot be clicked because
+                 neither side renders a tile button.
+*/
+function swapCoordinate(boardId, row, column) {
+  const oppositeBoardId = getOppositeBoardId(boardId);
+  const key = coordinateKey(row, column);
+
+  const currentBoard = game.boards[boardId];
+  const oppositeBoard = game.boards[oppositeBoardId];
+
+  const currentOccupant = currentBoard.get(key);
+  const oppositeOccupant = oppositeBoard.get(key);
+
+  currentBoard.set(key, oppositeOccupant);
+  oppositeBoard.set(key, currentOccupant);
+
+  if (currentOccupant) {
+    currentOccupant.position = {
+      boardId: oppositeBoardId,
+      row,
+      column
+    };
+  }
+
+  if (oppositeOccupant) {
+    oppositeOccupant.position = {
+      boardId,
+      row,
+      column
+    };
+  }
+}
+
+/*
+  A scramble chooses any coordinate containing at least one physical tile.
+  This means it faithfully includes tile ↔ Null exchanges, just as a
+  player move does. Null ↔ Null coordinates are excluded.
+*/
 function scrambleGame() {
-  const tilesAByCoordinate = new Map();
-  const tilesBByCoordinate = new Map();
+  const eligibleCoordinates = [];
 
-  for (const tile of game.tiles) {
-    const key = `${tile.position.row},${tile.position.column}`;
+  for (let row = 0; row < BOARD_SIZE; row += 1) {
+    for (let column = 0; column < BOARD_SIZE; column += 1) {
+      const key = coordinateKey(row, column);
+      const occupantA = game.boards.A.get(key);
+      const occupantB = game.boards.B.get(key);
 
-    if (tile.position.boardId === "A") {
-      tilesAByCoordinate.set(key, tile);
-    } else {
-      tilesBByCoordinate.set(key, tile);
+      if (occupantA || occupantB) {
+        eligibleCoordinates.push({ row, column });
+      }
     }
   }
 
-  /*
-    A coordinate is eligible only if each board has a physical tile at
-    exactly that row and column.  A selected coordinate swaps A↔B while
-    retaining the coordinate.
-  */
-  const matchingCoordinates = [...tilesAByCoordinate.keys()].filter(key =>
-    tilesBByCoordinate.has(key)
-  );
-
   const pairCount = Math.min(
     SCRAMBLE_PAIR_COUNT,
-    matchingCoordinates.length
+    eligibleCoordinates.length
   );
 
   if (pairCount === 0) {
-    throw new Error("The two boards have no matching tile positions to swap.");
+    throw new Error("There are no tile positions available to scramble.");
   }
 
-  const selectedCoordinates = shuffledCopy(matchingCoordinates).slice(
+  const selectedCoordinates = shuffledCopy(eligibleCoordinates).slice(
     0,
     pairCount
   );
 
-  for (const key of selectedCoordinates) {
-    const tileA = tilesAByCoordinate.get(key);
-    const tileB = tilesBByCoordinate.get(key);
-
-    swapTilePositions(tileA, tileB);
+  for (const { row, column } of selectedCoordinates) {
+    swapCoordinate("A", row, column);
   }
 
   game.scramblePairs = pairCount;
@@ -234,37 +304,69 @@ function createBoardTile(tile) {
   tileElement.style.gridRow = String(tile.position.row + 1);
   tileElement.style.gridColumn = String(tile.position.column + 1);
   tileElement.dataset.tileId = tile.id;
-  tileElement.dataset.homeBoard = tile.home.boardId;
-  tileElement.dataset.homeRow = String(tile.home.row);
-  tileElement.dataset.homeColumn = String(tile.home.column);
 
   tileElement.setAttribute(
     "aria-label",
-    `Grid ${tile.position.boardId}, letter ${tile.letter}, ` +
-      `originally from Grid ${tile.home.boardId}, ` +
-      `row ${tile.home.row + 1}, column ${tile.home.column + 1}`
+    `Move ${tile.letter} from Grid ${tile.position.boardId}, ` +
+      `row ${tile.position.row + 1}, column ${tile.position.column + 1}, ` +
+      `to the same position in Grid ${getOppositeBoardId(tile.position.boardId)}`
   );
 
   tileElement.textContent = tile.letter;
+  tileElement.addEventListener("click", handleTileClick);
 
   return tileElement;
 }
 
 function renderBoard(boardElement, boardId) {
-  const boardTiles = game.tiles.filter(tile => tile.position.boardId === boardId);
-  const tileElements = boardTiles.map(createBoardTile);
+  const tiles = [];
 
+  for (const tile of game.boards[boardId].values()) {
+    if (tile) {
+      tiles.push(tile);
+    }
+  }
+
+  const tileElements = tiles.map(createBoardTile);
   boardElement.replaceChildren(...tileElements);
 }
 
 function renderGame() {
   renderBoard(boardAElement, "A");
   renderBoard(boardBElement, "B");
+  moveCountElement.textContent = `Tiles moved: ${game.moves}`;
+}
+
+function handleTileClick(event) {
+  const tileId = event.currentTarget.dataset.tileId;
+  const tile = game.tiles.find(candidate => candidate.id === tileId);
+
+  if (!tile) {
+    return;
+  }
+
+  /*
+    A rendered button always represents a non-null tile. Therefore a
+    Null↔Null move cannot occur and cannot increase the move counter.
+  */
+  swapCoordinate(
+    tile.position.boardId,
+    tile.position.row,
+    tile.position.column
+  );
+
+  game.moves += 1;
+  renderGame();
+
+  statusElement.textContent =
+    `Tiles moved: ${game.moves}. ` +
+    `Click any visible tile to move it to the same position in the other grid.`;
 }
 
 function displayTwoPuzzles() {
   if (puzzles.length < 2) {
-    statusElement.textContent = "Error: At least two puzzle records are required.";
+    statusElement.textContent =
+      "Error: At least two puzzle records are required.";
     return;
   }
 
@@ -275,17 +377,18 @@ function displayTwoPuzzles() {
 
     game = createGame(puzzleA, puzzleB);
     scrambleGame();
-    renderGame();
 
     renderDebugSlots(puzzleAElement, puzzleA);
     renderDebugSlots(puzzleBElement, puzzleB);
+    renderGame();
 
     const totalTiles = game.tiles.length;
     const movedTiles = game.scramblePairs * 2;
 
     statusElement.textContent =
-      `Loaded two puzzles and scrambled ${game.scramblePairs} tile pairs ` +
-      `(${movedTiles} of ${totalTiles} physical tiles moved).`;
+      `Loaded two puzzles and scrambled ${game.scramblePairs} positions ` +
+      `(${movedTiles} tile movements possible across ${totalTiles} physical tiles). ` +
+      `Click any visible tile to move it.`;
   } catch (error) {
     console.error(error);
     boardAElement.replaceChildren();
@@ -299,7 +402,9 @@ async function loadPuzzles() {
     const response = await fetch(PUZZLE_FILE);
 
     if (!response.ok) {
-      throw new Error(`Could not load puzzle file: HTTP ${response.status}`);
+      throw new Error(
+        `Could not load puzzle file: HTTP ${response.status}`
+      );
     }
 
     const text = await response.text();

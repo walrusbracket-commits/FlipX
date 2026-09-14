@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FlipX — Two Board Test</title>
+  <title>FlipX — Play Test</title>
 
   <style>
     :root {
@@ -44,6 +44,13 @@
       color: #aebed1;
     }
 
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.9rem;
+    }
+
     button {
       padding: 0.7rem 1rem;
       border: 0;
@@ -64,16 +71,22 @@
       outline-offset: 3px;
     }
 
+    #move-count {
+      margin: 0;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid #40516a;
+      border-radius: 0.55rem;
+      background: #111924;
+      color: #dce9f8;
+      font-weight: 700;
+    }
+
     #status {
       min-height: 1.5rem;
       margin: 1rem 0;
       color: #aebed1;
     }
 
-    /*
-      The board cards display in a row where possible, and wrap
-      vertically on narrower screens.
-    */
     #boards {
       display: flex;
       flex-wrap: wrap;
@@ -91,6 +104,14 @@
       background: #111924;
     }
 
+    .board-card:first-child {
+      border-color: #6488b6;
+    }
+
+    .board-card:last-child {
+      border-color: #b58936;
+    }
+
     .board-title {
       margin: 0;
       text-align: center;
@@ -106,10 +127,6 @@
       padding: 0.25rem;
     }
 
-    /*
-      Coordinates 0–6 allow optional source letters to extend beyond
-      the central 5×5 FlipX lattice. Only actual letter tiles are added.
-    */
     .board {
       --tile-size: clamp(1.9rem, 7vw, 3.35rem);
       display: grid;
@@ -118,32 +135,50 @@
       gap: 3px;
     }
 
-   .tile {
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid #4e627e;
-  border-radius: 0.35rem;
-  cursor: default;
-  font: inherit;
-  font-size: clamp(0.95rem, 4vw, 1.45rem);
-  font-weight: 800;
-  line-height: 1;
-  text-transform: uppercase;
-  user-select: none;
-}
+    .tile {
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      min-height: 0;
+      padding: 0;
+      border: 1px solid #4e627e;
+      border-radius: 0.35rem;
+      cursor: pointer;
+      font: inherit;
+      font-size: clamp(0.95rem, 4vw, 1.45rem);
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+      user-select: none;
+      transition: transform 120ms ease, filter 120ms ease;
+      touch-action: manipulation;
+    }
 
-.tile--a {
-  background: #d9e9ff;
-  color: #10243d;
-  border-color: #6488b6;
-}
+    .tile:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+    }
 
-.tile--b {
-  background: #ffe7ad;
-  color: #3c2806;
-  border-color: #b58936;
-}
+    .tile:active {
+      transform: translateY(1px) scale(0.97);
+    }
+
+    .tile:focus-visible {
+      outline: 3px solid #79d9ba;
+      outline-offset: 3px;
+    }
+
+    .tile--a {
+      background: #d9e9ff;
+      color: #10243d;
+      border-color: #6488b6;
+    }
+
+    .tile--b {
+      background: #ffe7ad;
+      color: #3c2806;
+      border-color: #b58936;
+    }
 
     .debug-heading {
       margin: 0 0 0.65rem;
@@ -196,9 +231,12 @@
 <body>
   <main>
     <h1>FlipX</h1>
-    <p class="subtitle">Two-board renderer test</p>
+    <p class="subtitle">One-click tile-swap test</p>
 
-    <button id="new-puzzle" type="button">Load two new puzzles</button>
+    <div class="controls">
+      <button id="new-puzzle" type="button">New puzzle</button>
+      <p id="move-count" aria-live="polite">Tiles moved: 0</p>
+    </div>
 
     <p id="status" role="status">Loading puzzles…</p>
 
