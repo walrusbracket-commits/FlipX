@@ -71,6 +71,11 @@
       outline-offset: 3px;
     }
 
+    #new-puzzle.is-ready {
+      background: #54bc91;
+      color: #092117;
+    }
+
     #move-count {
       margin: 0;
       padding: 0.55rem 0.75rem;
@@ -85,6 +90,36 @@
       min-height: 1.5rem;
       margin: 1rem 0 0;
       color: #aebed1;
+    }
+
+    /*
+      The win banner is part of normal page flow, not a modal.
+      It never covers the completed boards.
+    */
+    #celebration {
+      display: none;
+      margin: 1rem 0 0;
+      padding: 1rem 1.15rem;
+      border: 1px solid #5ad2a9;
+      border-radius: 0.75rem;
+      background: #14372c;
+      color: #e4fff4;
+      text-align: center;
+    }
+
+    #celebration.is-visible {
+      display: block;
+      animation: celebration-in 260ms ease-out both;
+    }
+
+    #celebration h2 {
+      margin: 0;
+      font-size: clamp(1.35rem, 4vw, 1.75rem);
+    }
+
+    #celebration p {
+      margin: 0.4rem 0 0;
+      color: #c8f7e4;
     }
 
     #boards {
@@ -104,18 +139,10 @@
       background: #111924;
     }
 
-    .board-card:first-child {
-      border-color: #6488b6;
-    }
-
-    .board-card:last-child {
-      border-color: #b58936;
-    }
-
     .board-title {
       margin: 0;
       text-align: center;
-      color: #79d9ba;
+      color: #dce9f8;
       font-size: 1.2rem;
     }
 
@@ -135,14 +162,20 @@
       gap: 3px;
     }
 
+    /*
+      Every tile now looks the same. The player cannot identify an
+      intruding tile from its colour; only the word structure helps.
+    */
     .tile {
       display: grid;
       place-items: center;
       min-width: 0;
       min-height: 0;
       padding: 0;
-      border: 1px solid #4e627e;
+      border: 1px solid #73849a;
       border-radius: 0.35rem;
+      background: #edf2f7;
+      color: #172130;
       cursor: pointer;
       font: inherit;
       font-size: clamp(0.95rem, 4vw, 1.45rem);
@@ -173,22 +206,6 @@
       pointer-events: none;
     }
 
-    .tile--a {
-      background: #d9e9ff;
-      color: #10243d;
-      border-color: #6488b6;
-    }
-
-    .tile--b {
-      background: #ffe7ad;
-      color: #3c2806;
-      border-color: #b58936;
-    }
-
-    /*
-      The overlay contains only temporary moving copies of tiles.
-      pointer-events: none ensures it never intercepts a click.
-    */
     #animation-layer {
       position: fixed;
       inset: 0;
@@ -204,8 +221,10 @@
       place-items: center;
       margin: 0;
       padding: 0;
-      border: 1px solid #4e627e;
+      border: 1px solid #73849a;
       border-radius: 0.35rem;
+      background: #edf2f7;
+      color: #172130;
       font: inherit;
       font-size: clamp(0.95rem, 4vw, 1.45rem);
       font-weight: 800;
@@ -221,42 +240,49 @@
       z-index: 22;
     }
 
-    dialog {
-      width: min(28rem, calc(100% - 2rem));
-      padding: 0;
-      border: 1px solid #5ad2a9;
-      border-radius: 1rem;
-      background: #14372c;
-      color: #e4fff4;
-      box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 55%);
+    @keyframes celebration-in {
+      from {
+        opacity: 0;
+        transform: translateY(-0.45rem);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    dialog::backdrop {
-      background: rgb(0 0 0 / 64%);
+    @keyframes ready-pulse {
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgb(84 188 145 / 0%);
+        transform: scale(1);
+      }
+
+      50% {
+        box-shadow: 0 0 0 0.5rem rgb(84 188 145 / 26%);
+        transform: scale(1.04);
+      }
     }
 
-    .win-dialog-content {
-      padding: 1.75rem;
-      text-align: center;
+    @media (prefers-reduced-motion: no-preference) {
+      #new-puzzle.is-ready {
+        animation: ready-pulse 1.25s ease-in-out infinite;
+      }
     }
 
-    .win-dialog-content h2 {
-      margin: 0;
-      font-size: 2rem;
-    }
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+      }
 
-    .win-dialog-content p {
-      margin: 0.8rem 0 1.4rem;
-      color: #c8f7e4;
-    }
-
-    .win-dialog-content button {
-      background: #54bc91;
-      color: #092117;
-    }
-
-    .win-dialog-content button:hover {
-      background: #79ddb3;
+      .tile,
+      #celebration.is-visible {
+        transition: none;
+        animation: none;
+      }
     }
 
     @media (max-width: 38rem) {
@@ -293,6 +319,11 @@
 
     <p id="status" role="status">Loading puzzle data…</p>
 
+    <section id="celebration" aria-live="assertive" aria-label="Puzzle completed">
+      <h2>Well done!</h2>
+      <p id="celebration-message">You made two valid grids.</p>
+    </section>
+
     <section id="boards" aria-label="Two FlipX puzzle boards">
       <article class="board-card">
         <h2 class="board-title">Grid A</h2>
@@ -323,14 +354,6 @@
   </main>
 
   <div id="animation-layer" aria-hidden="true"></div>
-
-  <dialog id="win-dialog" aria-labelledby="win-title">
-    <div class="win-dialog-content">
-      <h2 id="win-title">Well done!</h2>
-      <p id="win-message">You made two valid grids.</p>
-      <button id="play-again" type="button" autofocus>Play another puzzle</button>
-    </div>
-  </dialog>
 
   <script src="./app.js"></script>
 </body>

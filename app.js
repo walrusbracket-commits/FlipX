@@ -8,20 +8,21 @@ const ANSWER_LENGTH = 7;
 const BOARD_SIZE = 7;
 const SCRAMBLE_PAIR_COUNT = 2;
 const MOVE_DURATION_MS = 1000;
+const CELEBRATION_DURATION_MS = 5000;
 
 const statusElement = document.querySelector("#status");
 const moveCountElement = document.querySelector("#move-count");
 const boardAElement = document.querySelector("#board-a");
 const boardBElement = document.querySelector("#board-b");
 const newPuzzleButton = document.querySelector("#new-puzzle");
+const celebrationElement = document.querySelector("#celebration");
+const celebrationMessageElement = document.querySelector("#celebration-message");
 const animationLayer = document.querySelector("#animation-layer");
-const winDialog = document.querySelector("#win-dialog");
-const winMessageElement = document.querySelector("#win-message");
-const playAgainButton = document.querySelector("#play-again");
 
 let puzzles = [];
 let dictionary = new Set();
 let game = null;
+let celebrationTimerId = null;
 
 function coordinateKey(row, column) {
   return `${row},${column}`;
@@ -296,7 +297,7 @@ function isGameSolved() {
 function createBoardTile(tile) {
   const tileElement = document.createElement("button");
 
-  tileElement.className = `tile tile--${tile.boardId.toLowerCase()}`;
+  tileElement.className = "tile";
   tileElement.type = "button";
   tileElement.style.gridRow = String(tile.position.row + 1);
   tileElement.style.gridColumn = String(tile.position.column + 1);
@@ -347,10 +348,6 @@ function makeFlyingTile(sourceElement, isFront) {
     flyingTile.classList.add("flying-tile--front");
   }
 
-  flyingTile.classList.add(
-    sourceElement.classList.contains("tile--a") ? "tile--a" : "tile--b"
-  );
-
   flyingTile.textContent = sourceElement.textContent;
   flyingTile.style.left = `${sourceRect.left}px`;
   flyingTile.style.top = `${sourceRect.top}px`;
@@ -365,16 +362,6 @@ function makeFlyingTile(sourceElement, isFront) {
   };
 }
 
-/*
-  Produces the route keyframes for one flying tile.
-
-  The route is intentionally asymmetric:
-  - Grid A click: clicked tile bows upward (foreground); returning tile
-    bows downward (background).
-  - Grid B click: those directions reverse.
-
-  This gives the desired clockwise / anticlockwise visual direction.
-*/
 function createArcKeyframes(startRect, endRect, isClickedTile, clickedBoardId) {
   const deltaX = endRect.left - startRect.left;
   const deltaY = endRect.top - startRect.top;
@@ -382,12 +369,6 @@ function createArcKeyframes(startRect, endRect, isClickedTile, clickedBoardId) {
 
   const clickedTravelsRight = clickedBoardId === "A";
   const direction = clickedTravelsRight ? 1 : -1;
-
-  /*
-    The selected tile takes the upper/front curve. The opposite tile
-    takes the lower/rear curve. When the player clicks Grid B, flip
-    those arcs to preserve the apparent rotational direction.
-  */
   const frontArc = isClickedTile ? -1 : 1;
   const verticalArcDirection = frontArc * direction;
 
@@ -410,6 +391,22 @@ function createArcKeyframes(startRect, endRect, isClickedTile, clickedBoardId) {
   ];
 }
 
+function getEmptyCoordinateRect(boardElement, row, column, referenceRect) {
+  const boardRect = boardElement.getBoundingClientRect();
+  const boardStyle = getComputedStyle(boardElement);
+  const gap = Number.parseFloat(boardStyle.columnGap) || 0;
+
+  const cellWidth = referenceRect.width;
+  const cellHeight = referenceRect.height;
+
+  return {
+    left: boardRect.left + column * (cellWidth + gap),
+    top: boardRect.top + row * (cellHeight + gap),
+    width: cellWidth,
+    height: cellHeight
+  };
+}
+
 async function animateTileMovement(clickedTile, oppositeTile) {
   const clickedElement = getTileElement(clickedTile.id);
 
@@ -426,16 +423,6 @@ async function animateTileMovement(clickedTile, oppositeTile) {
   const targetBoardElement =
     oppositeBoardId === "A" ? boardAElement : boardBElement;
 
-  const targetCoordinateSelector =
-    `.tile[style*="grid-row: ${clickedTile.position.row + 1}"]` +
-    `[style*="grid-column: ${clickedTile.position.column + 1}"]`;
-
-  /*
-    If the opposite position holds a tile, it already has a button at
-    the target coordinate. Its own rect supplies the other endpoint.
-    If it is Null, the invisible board grid coordinate still needs a
-    screen location, calculated from the board's box and tile spacing.
-  */
   let oppositeElement = null;
 
   for (const candidate of targetBoardElement.querySelectorAll(".tile")) {
@@ -457,9 +444,7 @@ async function animateTileMovement(clickedTile, oppositeTile) {
       clickedFlying.rect
     );
 
-  const animations = [];
-
-  animations.push(
+  const animations = [
     clickedFlying.element.animate(
       createArcKeyframes(
         clickedFlying.rect,
@@ -473,7 +458,7 @@ async function animateTileMovement(clickedTile, oppositeTile) {
         fill: "forwards"
       }
     ).finished
-  );
+  ];
 
   if (oppositeTile && oppositeElement) {
     const oppositeFlying = makeFlyingTile(oppositeElement, false);
@@ -503,35 +488,33 @@ async function animateTileMovement(clickedTile, oppositeTile) {
   }
 }
 
-/*
-  Works out the centre position of a Null coordinate in a board.
-  The board is a regular CSS grid, so we can use the board rectangle,
-  its computed column gap, and one visible tile's dimensions.
-*/
-function getEmptyCoordinateRect(boardElement, row, column, referenceRect) {
-  const boardRect = boardElement.getBoundingClientRect();
-  const boardStyle = getComputedStyle(boardElement);
-  const gap = Number.parseFloat(boardStyle.columnGap) || 0;
+function clearCelebration() {
+  if (celebrationTimerId !== null) {
+    window.clearTimeout(celebrationTimerId);
+    celebrationTimerId = null;
+  }
 
-  const cellWidth = referenceRect.width;
-  const cellHeight = referenceRect.height;
-
-  return {
-    left: boardRect.left + column * (cellWidth + gap),
-    top: boardRect.top + row * (cellHeight + gap),
-    width: cellWidth,
-    height: cellHeight
-  };
+  celebrationElement.classList.remove("is-visible");
+  newPuzzleButton.classList.remove("is-ready");
 }
 
-function showWinDialog() {
-  winMessageElement.textContent =
+function showCelebration() {
+  celebrationMessageElement.textContent =
     `You made two valid grids in ${game.moves} ` +
-    `${game.moves === 1 ? "move" : "moves"}.`;
+    `${game.moves === 1 ? "move" : "moves"}. ` +
+    "Choose New puzzle when you are ready.";
 
-  if (!winDialog.open) {
-    winDialog.showModal();
+  celebrationElement.classList.add("is-visible");
+  newPuzzleButton.classList.add("is-ready");
+
+  if (celebrationTimerId !== null) {
+    window.clearTimeout(celebrationTimerId);
   }
+
+  celebrationTimerId = window.setTimeout(() => {
+    celebrationElement.classList.remove("is-visible");
+    celebrationTimerId = null;
+  }, CELEBRATION_DURATION_MS);
 }
 
 async function handleTileClick(event) {
@@ -568,7 +551,7 @@ async function handleTileClick(event) {
     if (isGameSolved()) {
       game.solved = true;
       statusElement.textContent = "Both grids contain valid words.";
-      showWinDialog();
+      showCelebration();
     } else {
       statusElement.textContent =
         "Click any visible tile to move it to the matching position in the other grid.";
@@ -592,9 +575,7 @@ function displayTwoPuzzles() {
     return;
   }
 
-  if (winDialog.open) {
-    winDialog.close();
-  }
+  clearCelebration();
 
   try {
     const [recordA, recordB] = selectTwoDifferentPuzzles();
@@ -608,7 +589,7 @@ function displayTwoPuzzles() {
     if (isGameSolved()) {
       game.solved = true;
       statusElement.textContent = "This puzzle pair loaded already solved.";
-      showWinDialog();
+      showCelebration();
       return;
     }
 
@@ -673,6 +654,5 @@ async function loadGameData() {
 }
 
 newPuzzleButton.addEventListener("click", displayTwoPuzzles);
-playAgainButton.addEventListener("click", displayTwoPuzzles);
 
 loadGameData();
