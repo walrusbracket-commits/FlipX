@@ -65,12 +65,26 @@ function updateDifficultyButton() {
   );
 }
 
+function setDifficultySelectable(isSelectable) {
+  difficultyButton.disabled = !isSelectable;
+
+  if (isSelectable) {
+    difficultyButton.setAttribute(
+      "aria-label",
+      `Difficulty: ${getSelectedDifficulty().name}. ` +
+        "Click to change difficulty for the next puzzle."
+    );
+  } else {
+    difficultyButton.setAttribute(
+      "aria-label",
+      `Difficulty locked at ${game?.difficulty?.name || getSelectedDifficulty().name} ` +
+        "until this puzzle is completed."
+    );
+  }
+}
+
 function cycleDifficulty() {
-  /*
-    Do not interrupt a tile flight. The player can change level at any
-    other time, and it will take effect only on the next new puzzle.
-  */
-  if (game?.isAnimating) {
+  if (difficultyButton.disabled) {
     return;
   }
 
@@ -80,8 +94,7 @@ function cycleDifficulty() {
   updateDifficultyButton();
 
   statusElement.textContent =
-    `${getSelectedDifficulty().name} selected. ` +
-    "Press New puzzle to use this level.";
+    `${getSelectedDifficulty().name} selected for the next puzzle.`;
 }
 
 function formatElapsedTime(milliseconds) {
@@ -749,12 +762,14 @@ async function handleTileClick(event) {
     game.moves += 1;
     renderGame();
 
-    if (isGameSolved()) {
-      game.solved = true;
-      stopGameTimer();
-      statusElement.textContent = "Both grids contain valid words.";
-      showCelebration();
-    } else {
+  if (isGameSolved()) {
+    game.solved = true;
+    stopGameTimer();
+    setDifficultySelectable(true);
+    statusElement.textContent =
+      "Both grids contain valid words. Choose a level for your next puzzle.";
+    showCelebration();
+  } else {
       statusElement.textContent =
         "Click any visible tile to move it to the matching position in the other grid.";
     }
@@ -788,13 +803,17 @@ function displayTwoPuzzles() {
     scrambleGame();
     renderGame();
     startGameTimer();
+    setDifficultySelectable(false);
 
     if (isGameSolved()) {
       game.solved = true;
-      statusElement.textContent = "This puzzle pair loaded already solved.";
+      stopGameTimer();
+      setDifficultySelectable(true);
+      statusElement.textContent =
+        "This puzzle pair loaded already solved. Choose a level and press New puzzle.";
       showCelebration();
       return;
-    }
+  }
 
     statusElement.textContent =
       "Click any visible tile to move it to the matching position in the other grid.";
