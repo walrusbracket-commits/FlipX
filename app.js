@@ -14,7 +14,6 @@ const DIFFICULTY_LEVELS = [
 ];
 
 const MOVE_DURATION_MS = 1000;
-const CELEBRATION_DURATION_MS = 5000;
 
 const statusElement = document.querySelector("#status");
 const moveCountValueElement = document.querySelector("#move-count .hud-value");
@@ -29,13 +28,15 @@ const sharePanelElement = document.querySelector("#share-panel");
 const shareTextElement = document.querySelector("#share-text");
 const shareResultButton = document.querySelector("#share-result");
 const copyResultButton = document.querySelector("#copy-result");
+const dismissCelebrationButton = document.querySelector(
+  "#dismiss-celebration"
+);
 const copyStatusElement = document.querySelector("#copy-status");
 const animationLayer = document.querySelector("#animation-layer");
 
 let puzzles = [];
 let dictionary = new Set();
 let game = null;
-let celebrationTimerId = null;
 let timerIntervalId = null;
 let selectedDifficultyIndex = 0;
 
@@ -628,11 +629,6 @@ async function animateTileMovement(clickedTile, oppositeTile) {
 }
 
 function clearCelebration() {
-  if (celebrationTimerId !== null) {
-    window.clearTimeout(celebrationTimerId);
-    celebrationTimerId = null;
-  }
-
   celebrationElement.classList.remove("is-visible");
   sharePanelElement.classList.remove("is-visible");
   newPuzzleButton.classList.remove("is-ready");
@@ -655,10 +651,10 @@ function makeShareText() {
 function showCelebration() {
   const elapsedTime = formatElapsedTime(getElapsedTimeMilliseconds());
 
-celebrationMessageElement.textContent =
-  `${game.difficulty.name} completed: two valid grids in ${game.moves} ` +
-  `${game.moves === 1 ? "move" : "moves"} and ${elapsedTime}. ` +
-  "Choose New puzzle when you are ready.";
+  celebrationMessageElement.textContent =
+    `${game.difficulty.name} completed: two valid grids in ${game.moves} ` +
+    `${game.moves === 1 ? "move" : "moves"} and ${elapsedTime}. ` +
+    "Choose New puzzle when you are ready.";
 
   shareTextElement.value = makeShareText();
   copyStatusElement.textContent = "";
@@ -666,16 +662,15 @@ celebrationMessageElement.textContent =
   celebrationElement.classList.add("is-visible");
   sharePanelElement.classList.add("is-visible");
   newPuzzleButton.classList.add("is-ready");
+}
 
-  if (celebrationTimerId !== null) {
-    window.clearTimeout(celebrationTimerId);
-  }
+function dismissCelebration() {
+  celebrationElement.classList.remove("is-visible");
+  sharePanelElement.classList.remove("is-visible");
+  copyStatusElement.textContent = "";
 
-  celebrationTimerId = window.setTimeout(() => {
-    celebrationElement.classList.remove("is-visible");
-    sharePanelElement.classList.remove("is-visible");
-    celebrationTimerId = null;
-  }, CELEBRATION_DURATION_MS);
+  statusElement.textContent =
+    "Puzzle complete. Choose a level for the next puzzle, then press New puzzle.";
 }
 
 async function copyShareText() {
@@ -879,6 +874,8 @@ newPuzzleButton.addEventListener("click", displayTwoPuzzles);
 difficultyButton.addEventListener("click", cycleDifficulty);
 copyResultButton.addEventListener("click", copyShareText);
 shareResultButton.addEventListener("click", shareResult);
+dismissCelebrationButton.addEventListener("click", dismissCelebration);
 
 updateDifficultyButton();
+setDifficultySelectable(true);
 loadGameData();
