@@ -65,7 +65,17 @@
     button:hover {
       background: #75a7ff;
     }
+.difficulty-button {
+  background: #6a57ba;
+}
 
+.difficulty-button:hover {
+  background: #8976dc;
+}
+
+.difficulty-button:focus-visible {
+  outline-color: #d9ccff;
+}
     button:focus-visible {
       outline: 3px solid #79d9ba;
       outline-offset: 3px;
@@ -76,15 +86,41 @@
       color: #092117;
     }
 
-    #move-count {
-      margin: 0;
-      padding: 0.55rem 0.75rem;
-      border: 1px solid #40516a;
-      border-radius: 0.55rem;
-      background: #111924;
-      color: #dce9f8;
-      font-weight: 700;
-    }
+    .hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.hud-stat {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #40516a;
+  border-radius: 0.55rem;
+  background: #111924;
+  color: #dce9f8;
+}
+
+.hud-label {
+  color: #aebed1;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hud-value {
+  min-width: 3.2rem;
+  color: #f4f7fb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: right;
+}
 
     #status {
       min-height: 1.5rem;
@@ -370,9 +406,29 @@
     <p class="subtitle">Make both grids into valid words.</p>
 
     <div class="controls">
-      <button id="new-puzzle" type="button">New puzzle</button>
-      <p id="move-count" aria-live="polite">Tiles moved: 0</p>
-    </div>
+  <button id="new-puzzle" type="button">New puzzle</button>
+
+  <button
+    id="difficulty-button"
+    class="difficulty-button"
+    type="button"
+    aria-label="Difficulty: Beginner. Click to change difficulty."
+  >
+    Level: Beginner
+  </button>
+  
+  <div class="hud" aria-label="Game statistics">
+    <p id="move-count" class="hud-stat" aria-live="polite">
+      <span class="hud-label">Moves</span>
+      <span class="hud-value">0</span>
+    </p>
+
+    <p id="timer" class="hud-stat" aria-live="polite">
+      <span class="hud-label">Time</span>
+      <span class="hud-value">00:00</span>
+    </p>
+  </div>
+</div>
 
     <p id="status" role="status">Loading puzzle data…</p>
 

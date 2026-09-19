@@ -6,15 +6,23 @@ const DICTIONARY_FILE = "./data/dictionary.txt";
 const RECORD_LENGTH = 42;
 const ANSWER_LENGTH = 7;
 const BOARD_SIZE = 7;
-const SCRAMBLE_PAIR_COUNT = 2;
+const DIFFICULTY_LEVELS = [
+  { name: "Beginner", scramblePairs: 4 },
+  { name: "Easy", scramblePairs: 8 },
+  { name: "Hard", scramblePairs: 12 },
+  { name: "Hardest", scramblePairs: 16 }
+];
+
 const MOVE_DURATION_MS = 1000;
 const CELEBRATION_DURATION_MS = 5000;
 
 const statusElement = document.querySelector("#status");
-const moveCountElement = document.querySelector("#move-count");
+const moveCountValueElement = document.querySelector("#move-count .hud-value");
+const timerValueElement = document.querySelector("#timer .hud-value");
 const boardAElement = document.querySelector("#board-a");
 const boardBElement = document.querySelector("#board-b");
 const newPuzzleButton = document.querySelector("#new-puzzle");
+const difficultyButton = document.querySelector("#difficulty-button");
 const celebrationElement = document.querySelector("#celebration");
 const celebrationMessageElement = document.querySelector("#celebration-message");
 const sharePanelElement = document.querySelector("#share-panel");
@@ -28,6 +36,8 @@ let puzzles = [];
 let dictionary = new Set();
 let game = null;
 let celebrationTimerId = null;
+let timerIntervalId = null;
+let selectedDifficultyIndex = 0;
 
 function coordinateKey(row, column) {
   return `${row},${column}`;
@@ -35,6 +45,110 @@ function coordinateKey(row, column) {
 
 function getOppositeBoardId(boardId) {
   return boardId === "A" ? "B" : "A";
+}
+
+function getSelectedDifficulty() {
+  return DIFFICULTY_LEVELS[selectedDifficultyIndex];
+}
+
+function updateDifficultyButton() {
+  const currentDifficulty = getSelectedDifficulty();
+  const nextIndex =
+    (selectedDifficultyIndex + 1) % DIFFICULTY_LEVELS.length;
+  const nextDifficulty = DIFFICULTY_LEVELS[nextIndex];
+
+  difficultyButton.textContent = `Level: ${currentDifficulty.name}`;
+  difficultyButton.setAttribute(
+    "aria-label",
+    `Difficulty: ${currentDifficulty.name}. ` +
+      `Click to change to ${nextDifficulty.name}.`
+  );
+}
+
+function cycleDifficulty() {
+  /*
+    Do not interrupt a tile flight. The player can change level at any
+    other time, and it will take effect only on the next new puzzle.
+  */
+  if (game?.isAnimating) {
+    return;
+  }
+
+  selectedDifficultyIndex =
+    (selectedDifficultyIndex + 1) % DIFFICULTY_LEVELS.length;
+
+  updateDifficultyButton();
+
+  statusElement.textContent =
+    `${getSelectedDifficulty().name} selected. ` +
+    "Press New puzzle to use this level.";
+}
+
+function formatElapsedTime(milliseconds) {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getElapsedTimeMilliseconds() {
+  if (!game || game.timerStartedAt === null) {
+    return 0;
+  }
+
+  const endTime = game.timerStoppedAt === null
+    ? performance.now()
+    : game.timerStoppedAt;
+
+  return Math.max(0, endTime - game.timerStartedAt);
+}
+
+function updateTimerDisplay() {
+  if (!timerValueElement) {
+    return;
+  }
+
+  timerValueElement.textContent = formatElapsedTime(
+    getElapsedTimeMilliseconds()
+  );
+}
+
+function startGameTimer() {
+  if (!game) {
+    return;
+  }
+
+  if (timerIntervalId !== null) {
+    window.clearInterval(timerIntervalId);
+    timerIntervalId = null;
+  }
+
+  game.timerStartedAt = performance.now();
+  game.timerStoppedAt = null;
+
+  updateTimerDisplay();
+
+  timerIntervalId = window.setInterval(() => {
+    updateTimerDisplay();
+  }, 250);
+}
+
+function stopGameTimer() {
+  if (!game) {
+    return;
+  }
+
+  if (game.timerStartedAt !== null && game.timerStoppedAt === null) {
+    game.timerStoppedAt = performance.now();
+  }
+
+  if (timerIntervalId !== null) {
+    window.clearInterval(timerIntervalId);
+    timerIntervalId = null;
+  }
+
+  updateTimerDisplay();
 }
 
 function selectTwoDifferentPuzzles() {
@@ -157,16 +271,19 @@ function createGame(puzzleA, puzzleB) {
   }
 
   return {
-    boards: {
-      A: boardA,
-      B: boardB
-    },
-    tiles: [...tilesA, ...tilesB],
-    scramblePairs: 0,
-    moves: 0,
-    solved: false,
-    isAnimating: false
-  };
+  boards: {
+    A: boardA,
+    B: boardB
+  },
+  tiles: [...tilesA, ...tilesB],
+  difficulty: getSelectedDifficulty(),
+  scramblePairs: 0,
+  moves: 0,
+  solved: false,
+  isAnimating: false,
+  timerStartedAt: null,
+  timerStoppedAt: null
+};
 }
 
 function shuffledCopy(items) {
@@ -227,10 +344,12 @@ function scrambleGame() {
     }
   }
 
-  const pairCount = Math.min(
-    SCRAMBLE_PAIR_COUNT,
-    eligibleCoordinates.length
-  );
+const difficulty = getSelectedDifficulty();
+
+const pairCount = Math.min(
+  difficulty.scramblePairs,
+  eligibleCoordinates.length
+);
 
   if (pairCount === 0) {
     throw new Error("There are no tile positions available to scramble.");
@@ -336,7 +455,9 @@ function renderBoard(boardElement, boardId) {
 function renderGame() {
   renderBoard(boardAElement, "A");
   renderBoard(boardBElement, "B");
-  moveCountElement.textContent = `Tiles moved: ${game.moves}`;
+
+  moveCountValueElement.textContent = String(game.moves);
+  updateTimerDisplay();
 }
 
 function getTileElement(tileId) {
@@ -508,19 +629,23 @@ function clearCelebration() {
 
 function makeShareText() {
   const moveWord = game.moves === 1 ? "move" : "moves";
+  const elapsedTime = formatElapsedTime(getElapsedTimeMilliseconds());
 
   return [
-    `I solved FlipX in ${game.moves} ${moveWord}!`,
+    `I solved FlipX — ${game.difficulty.name} — in ` +
+      `${game.moves} ${moveWord} and ${elapsedTime}!`,
     "",
     "Can you make both grids into valid words?"
   ].join("\n");
 }
 
 function showCelebration() {
-  celebrationMessageElement.textContent =
-    `You made two valid grids in ${game.moves} ` +
-    `${game.moves === 1 ? "move" : "moves"}. ` +
-    "Choose New puzzle when you are ready.";
+  const elapsedTime = formatElapsedTime(getElapsedTimeMilliseconds());
+
+celebrationMessageElement.textContent =
+  `${game.difficulty.name} completed: two valid grids in ${game.moves} ` +
+  `${game.moves === 1 ? "move" : "moves"} and ${elapsedTime}. ` +
+  "Choose New puzzle when you are ready.";
 
   shareTextElement.value = makeShareText();
   copyStatusElement.textContent = "";
@@ -626,6 +751,7 @@ async function handleTileClick(event) {
 
     if (isGameSolved()) {
       game.solved = true;
+      stopGameTimer();
       statusElement.textContent = "Both grids contain valid words.";
       showCelebration();
     } else {
@@ -661,6 +787,7 @@ function displayTwoPuzzles() {
     game = createGame(puzzleA, puzzleB);
     scrambleGame();
     renderGame();
+    startGameTimer();
 
     if (isGameSolved()) {
       game.solved = true;
@@ -730,7 +857,9 @@ async function loadGameData() {
 }
 
 newPuzzleButton.addEventListener("click", displayTwoPuzzles);
+difficultyButton.addEventListener("click", cycleDifficulty);
 copyResultButton.addEventListener("click", copyShareText);
 shareResultButton.addEventListener("click", shareResult);
 
+updateDifficultyButton();
 loadGameData();
