@@ -1,0 +1,10 @@
+# Intermediate and diagnostic puzzle output
+data/uniquepuzzles-rejected.txt
+data/uniquepuzzles-test-20.txt
+data/uniquepuzzles.txt
+data/uniquepuzzles_2ndGo.txt
+uniquepuzzles-bb-raw.txt
+
+# Python cache files
+__pycache__/
+*.py[cod]
