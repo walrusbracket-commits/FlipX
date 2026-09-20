@@ -755,12 +755,14 @@ function clearCelebration() {
 function makeShareText() {
   const moveWord = game.moves === 1 ? "move" : "moves";
   const elapsedTime = formatElapsedTime(getElapsedTimeMilliseconds());
+  const gameUrl = window.location.origin + "/";
 
   return [
     `I solved FlipX — ${game.difficulty.name} — in ` +
       `${game.moves} ${moveWord} and ${elapsedTime}!`,
     "",
-    "Can you make both grids into valid words?"
+    "Can you make both grids into valid words?",
+    gameUrl
   ].join("\n");
 }
 
