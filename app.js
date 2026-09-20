@@ -13,7 +13,17 @@ const DIFFICULTY_LEVELS = [
   { name: "Hardest", scramblePairs: 16 }
 ];
 
-const MOVE_DURATION_MS = 1000;
+const DIFFICULTY_STORAGE_KEY = "flipx-selected-difficulty";
+
+const SPEED_LEVELS = [
+  { name: "Normal", durationMs: 500 },
+  { name: "Faster", durationMs: 300 },
+  { name: "Fastest", durationMs: 150 },
+  { name: "Slow", durationMs: 1000 }
+];
+
+const SPEED_STORAGE_KEY = "flipx-selected-speed";
+const REDUCED_MOTION_DURATION_MS = 50;
 
 const statusElement = document.querySelector("#status");
 const moveCountValueElement = document.querySelector("#move-count .hud-value");
@@ -22,6 +32,7 @@ const boardAElement = document.querySelector("#board-a");
 const boardBElement = document.querySelector("#board-b");
 const newPuzzleButton = document.querySelector("#new-puzzle");
 const difficultyButton = document.querySelector("#difficulty-button");
+const speedButton = document.querySelector("#speed-button");
 const celebrationElement = document.querySelector("#celebration");
 const celebrationMessageElement = document.querySelector("#celebration-message");
 const sharePanelElement = document.querySelector("#share-panel");
@@ -39,6 +50,7 @@ let dictionary = new Set();
 let game = null;
 let timerIntervalId = null;
 let selectedDifficultyIndex = 0;
+let selectedSpeedIndex = 0;
 
 function coordinateKey(row, column) {
   return `${row},${column}`;
@@ -50,6 +62,37 @@ function getOppositeBoardId(boardId) {
 
 function getSelectedDifficulty() {
   return DIFFICULTY_LEVELS[selectedDifficultyIndex];
+}
+
+function saveSelectedDifficulty() {
+  try {
+    localStorage.setItem(
+      DIFFICULTY_STORAGE_KEY,
+      getSelectedDifficulty().name
+    );
+  } catch (error) {
+    console.warn("Could not save difficulty preference.", error);
+  }
+}
+
+function loadSelectedDifficulty() {
+  try {
+    const savedName = localStorage.getItem(DIFFICULTY_STORAGE_KEY);
+
+    if (!savedName) {
+      return;
+    }
+
+    const savedIndex = DIFFICULTY_LEVELS.findIndex(
+      difficulty => difficulty.name === savedName
+    );
+
+    if (savedIndex !== -1) {
+      selectedDifficultyIndex = savedIndex;
+    }
+  } catch (error) {
+    console.warn("Could not load difficulty preference.", error);
+  }
 }
 
 function updateDifficultyButton() {
@@ -92,10 +135,83 @@ function cycleDifficulty() {
   selectedDifficultyIndex =
     (selectedDifficultyIndex + 1) % DIFFICULTY_LEVELS.length;
 
+   saveSelectedDifficulty();
   updateDifficultyButton();
 
   statusElement.textContent =
     `${getSelectedDifficulty().name} selected for the next puzzle.`;
+}
+
+function getSelectedSpeed() {
+  return SPEED_LEVELS[selectedSpeedIndex];
+}
+
+function getMoveDurationMs() {
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)"
+  ).matches;
+
+  if (prefersReducedMotion) {
+    return REDUCED_MOTION_DURATION_MS;
+  }
+
+  return getSelectedSpeed().durationMs;
+}
+
+function updateSpeedButton() {
+  const currentSpeed = getSelectedSpeed();
+  const nextIndex = (selectedSpeedIndex + 1) % SPEED_LEVELS.length;
+  const nextSpeed = SPEED_LEVELS[nextIndex];
+
+  speedButton.textContent = `Speed: ${currentSpeed.name}`;
+  speedButton.setAttribute(
+    "aria-label",
+    `Game speed: ${currentSpeed.name}. ` +
+      `Click to change to ${nextSpeed.name}.`
+  );
+}
+
+function saveSelectedSpeed() {
+  try {
+    localStorage.setItem(SPEED_STORAGE_KEY, getSelectedSpeed().name);
+  } catch (error) {
+    console.warn("Could not save speed preference.", error);
+  }
+}
+
+function loadSelectedSpeed() {
+  try {
+    const savedName = localStorage.getItem(SPEED_STORAGE_KEY);
+
+    if (!savedName) {
+      return;
+    }
+
+    const savedIndex = SPEED_LEVELS.findIndex(
+      speed => speed.name === savedName
+    );
+
+    if (savedIndex !== -1) {
+      selectedSpeedIndex = savedIndex;
+    }
+  } catch (error) {
+    console.warn("Could not load speed preference.", error);
+  }
+}
+
+function cycleSpeed() {
+  if (speedButton.disabled) {
+    return;
+  }
+
+  selectedSpeedIndex =
+    (selectedSpeedIndex + 1) % SPEED_LEVELS.length;
+
+  saveSelectedSpeed();
+  updateSpeedButton();
+
+  statusElement.textContent =
+    `${getSelectedSpeed().name} animation speed selected.`;
 }
 
 function formatElapsedTime(milliseconds) {
@@ -593,7 +709,7 @@ async function animateTileMovement(clickedTile, oppositeTile) {
         clickedBoardId
       ),
       {
-        duration: MOVE_DURATION_MS,
+        duration: getMoveDurationMs(),
         easing: "ease-in-out",
         fill: "forwards"
       }
@@ -613,7 +729,7 @@ async function animateTileMovement(clickedTile, oppositeTile) {
           clickedBoardId
         ),
         {
-          duration: MOVE_DURATION_MS,
+          duration: getMoveDurationMs(),
           easing: "ease-in-out",
           fill: "forwards"
         }
@@ -748,6 +864,7 @@ async function handleTileClick(event) {
 
   game.isAnimating = true;
   newPuzzleButton.disabled = true;
+  speedButton.disabled = true;
   statusElement.textContent = "Moving tile…";
 
   try {
@@ -774,8 +891,9 @@ async function handleTileClick(event) {
   } finally {
     game.isAnimating = false;
     newPuzzleButton.disabled = false;
+    speedButton.disabled = false;
   }
-}
+  }
 
 function displayTwoPuzzles() {
   if (puzzles.length < 2 || dictionary.size === 0) {
@@ -872,10 +990,15 @@ async function loadGameData() {
 
 newPuzzleButton.addEventListener("click", displayTwoPuzzles);
 difficultyButton.addEventListener("click", cycleDifficulty);
+speedButton.addEventListener("click", cycleSpeed);
 copyResultButton.addEventListener("click", copyShareText);
 shareResultButton.addEventListener("click", shareResult);
 dismissCelebrationButton.addEventListener("click", dismissCelebration);
 
+loadSelectedDifficulty();
+loadSelectedSpeed();
+
 updateDifficultyButton();
+updateSpeedButton();
 setDifficultySelectable(true);
 loadGameData();

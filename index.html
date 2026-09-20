@@ -77,6 +77,25 @@
   outline-color: #d9ccff;
 }
 
+.speed-button {
+  background: #317d94;
+}
+
+.speed-button:hover {
+  background: #459db8;
+}
+
+.speed-button:focus-visible {
+  outline-color: #9ae8ff;
+}
+
+.speed-button:disabled {
+  cursor: not-allowed;
+  background: #3e4654;
+  color: #9eaab9;
+  opacity: 0.7;
+}
+
 .difficulty-button:disabled {
   cursor: not-allowed;
   background: #3e4654;
@@ -417,15 +436,24 @@
   <button id="new-puzzle" type="button">New puzzle</button>
 
   <button
-    id="difficulty-button"
-    class="difficulty-button"
-    type="button"
-    aria-label="Difficulty: Beginner. Click to change difficulty."
-  >
-    Level: Beginner
-  </button>
-  
-  <div class="hud" aria-label="Game statistics">
+  id="difficulty-button"
+  class="difficulty-button"
+  type="button"
+  aria-label="Difficulty: Beginner. Click to change difficulty."
+>
+  Level: Beginner
+</button>
+
+<button
+  id="speed-button"
+  class="speed-button"
+  type="button"
+  aria-label="Game speed: Normal. Click to change speed."
+>
+  Speed: Normal
+</button>
+
+<div class="hud" aria-label="Game statistics">
     <p id="move-count" class="hud-stat" aria-live="polite">
       <span class="hud-label">Moves</span>
       <span class="hud-value">0</span>
