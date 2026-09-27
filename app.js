@@ -6,6 +6,20 @@ const DICTIONARY_FILE = "./data/dictionary.txt";
 const RECORD_LENGTH = 42;
 const ANSWER_LENGTH = 7;
 const BOARD_SIZE = 7;
+const DAILY_ORIGIN_UTC = Date.UTC(2026, 0, 1);
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function getDailyNumber(date = new Date()) {
+  const utcMidnight = Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  );
+
+  return Math.floor(
+    (utcMidnight - DAILY_ORIGIN_UTC) / MILLISECONDS_PER_DAY
+  ) + 1;
+}
 const DIFFICULTY_LEVELS = [
   { name: "Beginner", scramblePairs: 4 },
   { name: "Easy", scramblePairs: 8 },
@@ -304,6 +318,77 @@ function splitPuzzleRecord(record) {
   };
 }
 
+function getDailyPair(date = new Date()) {
+  if (puzzles.length < 2) {
+    throw new Error("Puzzle data has not loaded yet.");
+  }
+
+  const dayIndex = getDailyNumber(date) - 1;
+  const count = puzzles.length;
+  const firstIndex = (13 * dayIndex + 101) % count;
+  let secondIndex = (31 * dayIndex + 607) % count;
+
+  const firstWords = [];
+  for (let offset = 0; offset < RECORD_LENGTH; offset += ANSWER_LENGTH) {
+    firstWords.push(
+      puzzles[firstIndex].slice(offset, offset + ANSWER_LENGTH)
+        .replaceAll("_", "")
+        .toLowerCase()
+    );
+  }
+
+  for (let retries = 0; retries < count; retries += 1) {
+    const secondWords = [];
+
+    for (let offset = 0; offset < RECORD_LENGTH; offset += ANSWER_LENGTH) {
+      secondWords.push(
+        puzzles[secondIndex].slice(offset, offset + ANSWER_LENGTH)
+          .replaceAll("_", "")
+          .toLowerCase()
+      );
+    }
+
+    const allWords = [...firstWords, ...secondWords];
+
+    if (
+      firstIndex !== secondIndex &&
+      new Set(allWords).size === 12
+    ) {
+      return {
+        dailyNumber: dayIndex + 1,
+        firstIndex,
+        secondIndex,
+        retries
+      };
+    }
+
+    secondIndex = (secondIndex + 37) % count;
+  }
+
+  throw new Error("No valid partner found for this Daily puzzle.");
+}
+
+function getDailyDifficulty(date = new Date()) {
+  const dayIndex = getDailyNumber(date) - 1;
+
+  let value = (dayIndex ^ 0x9e3779b9) >>> 0;
+  value = Math.imul(value ^ (value >>> 16), 0x7feb352d) >>> 0;
+  value = Math.imul(value ^ (value >>> 15), 0x846ca68b) >>> 0;
+  value = (value ^ (value >>> 16)) >>> 0;
+
+  const roll = value % 4;
+
+  if (roll === 0) {
+    return DIFFICULTY_LEVELS[1]; // Easy
+  }
+
+  if (roll === 3) {
+    return DIFFICULTY_LEVELS[3]; // Hardest
+  }
+
+  return DIFFICULTY_LEVELS[2]; // Hard
+}
+
 function makeBoardCells(puzzle) {
   const cells = new Map();
 
@@ -385,7 +470,11 @@ function placeTile(board, tile) {
   board.set(coordinateKey(tile.position.row, tile.position.column), tile);
 }
 
-function createGame(puzzleA, puzzleB) {
+function createGame(
+  puzzleA,
+  puzzleB,
+  difficulty = getSelectedDifficulty()
+) {
   const boardA = createBoardState();
   const boardB = createBoardState();
 
@@ -406,7 +495,7 @@ function createGame(puzzleA, puzzleB) {
     B: boardB
   },
   tiles: [...tilesA, ...tilesB],
-  difficulty: getSelectedDifficulty(),
+  difficulty,
   scramblePairs: 0,
   moves: 0,
   solved: false,
@@ -416,11 +505,11 @@ function createGame(puzzleA, puzzleB) {
 };
 }
 
-function shuffledCopy(items) {
+function shuffledCopy(items, random = Math.random) {
   const copy = [...items];
 
   for (let index = copy.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
+    const randomIndex = Math.floor(random() * (index + 1));
 
     [copy[index], copy[randomIndex]] = [
       copy[randomIndex],
@@ -429,6 +518,28 @@ function shuffledCopy(items) {
   }
 
   return copy;
+}
+
+function makeDailyRandom(date = new Date()) {
+  const dayIndex = getDailyNumber(date) - 1;
+
+  let state = (dayIndex ^ 0xa5a5a5a5) >>> 0;
+  state = Math.imul(state ^ (state >>> 16), 0x7feb352d) >>> 0;
+  state = Math.imul(state ^ (state >>> 15), 0x846ca68b) >>> 0;
+  state = (state ^ (state >>> 16)) >>> 0;
+
+  if (state === 0) {
+    state = 1;
+  }
+
+  return function dailyRandom() {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+
+    return state / 4294967296;
+  };
 }
 
 function swapCoordinate(boardId, row, column) {
@@ -461,7 +572,7 @@ function swapCoordinate(boardId, row, column) {
   }
 }
 
-function scrambleGame() {
+function scrambleGame(random = Math.random) {
   const eligibleCoordinates = [];
 
   for (let row = 0; row < BOARD_SIZE; row += 1) {
@@ -474,7 +585,7 @@ function scrambleGame() {
     }
   }
 
-const difficulty = getSelectedDifficulty();
+const difficulty = game.difficulty;
 
 const pairCount = Math.min(
   difficulty.scramblePairs,
@@ -485,7 +596,7 @@ const pairCount = Math.min(
     throw new Error("There are no tile positions available to scramble.");
   }
 
-  const selectedCoordinates = shuffledCopy(eligibleCoordinates).slice(
+  const selectedCoordinates = shuffledCopy(eligibleCoordinates, random).slice(
     0,
     pairCount
   );
