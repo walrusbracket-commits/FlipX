@@ -820,7 +820,7 @@ async function shareResult() {
     try {
       await navigator.share({
         title: "FlipX",
-        text
+        text,
         url: window.location.origin + "/"
       });
 
