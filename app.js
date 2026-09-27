@@ -821,6 +821,7 @@ async function shareResult() {
       await navigator.share({
         title: "FlipX",
         text
+        url: window.location.origin + "/"
       });
 
       copyStatusElement.textContent = "Thanks for sharing FlipX!";
