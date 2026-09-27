@@ -1,7 +1,7 @@
 "use strict";
 
-const PUZZLE_FILE = "./data/uniquepuzzles-verified.txt";
-const DICTIONARY_FILE = "./data/dictionary.txt";
+const PUZZLE_FILE = "/data/uniquepuzzles-verified.txt";
+const DICTIONARY_FILE = "/data/dictionary.txt";
 
 const RECORD_LENGTH = 42;
 const ANSWER_LENGTH = 7;
@@ -58,6 +58,7 @@ const dismissCelebrationButton = document.querySelector(
 );
 const copyStatusElement = document.querySelector("#copy-status");
 const animationLayer = document.querySelector("#animation-layer");
+const helpMeButton = document.querySelector("#help-me");
 
 let puzzles = [];
 let dictionary = new Set();
@@ -110,6 +111,7 @@ function loadSelectedDifficulty() {
 }
 
 function updateDifficultyButton() {
+  if (!difficultyButton) return;
   const currentDifficulty = getSelectedDifficulty();
   const nextIndex =
     (selectedDifficultyIndex + 1) % DIFFICULTY_LEVELS.length;
@@ -124,6 +126,7 @@ function updateDifficultyButton() {
 }
 
 function setDifficultySelectable(isSelectable) {
+      if (!difficultyButton) return;
   difficultyButton.disabled = !isSelectable;
 
   if (isSelectable) {
@@ -866,6 +869,17 @@ function clearCelebration() {
 function makeShareText() {
   const moveWord = game.moves === 1 ? "move" : "moves";
   const elapsedTime = formatElapsedTime(getElapsedTimeMilliseconds());
+
+  if (document.body.dataset.gameMode === "daily") {
+    return [
+      `FlipX Daily #${game.dailyNumber} — ${game.difficulty.name}`,
+      `${game.moves} ${moveWord} · ${elapsedTime}`,
+      "",
+      "Can you make both grids into valid words?",
+      window.location.origin + "/daily/"
+    ].join("\n");
+  }
+
   const gameUrl = window.location.origin + "/";
 
   return [
@@ -880,10 +894,13 @@ function makeShareText() {
 function showCelebration() {
   const elapsedTime = formatElapsedTime(getElapsedTimeMilliseconds());
 
-  celebrationMessageElement.textContent =
-    `${game.difficulty.name} completed: two valid grids in ${game.moves} ` +
-    `${game.moves === 1 ? "move" : "moves"} and ${elapsedTime}. ` +
-    "Choose New puzzle when you are ready.";
+    celebrationMessageElement.textContent =
+    document.body.dataset.gameMode === "daily"
+      ? `Daily #${game.dailyNumber} completed: two valid grids in ` +
+        `${game.moves} ${game.moves === 1 ? "move" : "moves"} and ${elapsedTime}.`
+      : `${game.difficulty.name} completed: two valid grids in ${game.moves} ` +
+        `${game.moves === 1 ? "move" : "moves"} and ${elapsedTime}. ` +
+        "Choose New puzzle when you are ready.";
 
   shareTextElement.value = makeShareText();
   copyStatusElement.textContent = "";
@@ -992,8 +1009,10 @@ async function handleTileClick(event) {
     game.solved = true;
     stopGameTimer();
     setDifficultySelectable(true);
-    statusElement.textContent =
-      "Both grids contain valid words. Choose a level for your next puzzle.";
+        statusElement.textContent =
+      document.body.dataset.gameMode === "daily"
+        ? "Both grids contain valid words. Today's Daily is complete."
+        : "Both grids contain valid words. Choose a level for your next puzzle.";
     showCelebration();
   } else {
       statusElement.textContent =
@@ -1022,12 +1041,40 @@ function displayTwoPuzzles() {
   clearCelebration();
 
   try {
-    const [recordA, recordB] = selectTwoDifferentPuzzles();
-    const puzzleA = splitPuzzleRecord(recordA);
-    const puzzleB = splitPuzzleRecord(recordB);
+    const isDaily = document.body.dataset.gameMode === "daily";
+    const today = new Date();
 
-    game = createGame(puzzleA, puzzleB);
-    scrambleGame();
+    const [recordA, recordB] = isDaily
+      ? (() => {
+          const pair = getDailyPair(today);
+          return [puzzles[pair.firstIndex], puzzles[pair.secondIndex]];
+        })()
+      : selectTwoDifferentPuzzles();
+
+const puzzleA = splitPuzzleRecord(recordA);
+const puzzleB = splitPuzzleRecord(recordB);
+
+game = createGame(
+  puzzleA,
+  puzzleB,
+  isDaily ? getDailyDifficulty(today) : getSelectedDifficulty()
+);
+
+if (isDaily) {
+  game.dailyNumber = getDailyNumber(today);
+
+  const dateLabel = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }).format(today);
+
+  document.querySelector("#daily-details").textContent =
+    `${dateLabel} · ${game.difficulty.name} · Daily #${game.dailyNumber}`;
+}
+
+scrambleGame(isDaily ? makeDailyRandom(today) : Math.random);
     renderGame();
     startGameTimer();
     setDifficultySelectable(false);
@@ -1102,8 +1149,48 @@ async function loadGameData() {
   }
 }
 
+async function shareHelpRequest() {
+  if (!game || game.solved) {
+    statusElement.textContent = "Help Me is for a Daily puzzle in progress.";
+    return;
+  }
+
+  const url = window.location.origin + "/daily/";
+  const message =
+    `Help me! I'm stuck on FlipX Daily #${game.dailyNumber}. ` +
+    "Can you solve today's puzzle?";
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "Help me with FlipX Daily",
+        text: message,
+        url
+      });
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      console.warn("Sharing was unavailable; trying to copy instead.", error);
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(`${message}\n${url}`);
+    statusElement.textContent = "Help request and Daily link copied. Paste them into a message.";
+  } catch (error) {
+    console.error(error);
+    statusElement.textContent =
+      "Could not copy the help request on this device.";
+  }
+}
+
 newPuzzleButton.addEventListener("click", displayTwoPuzzles);
-difficultyButton.addEventListener("click", cycleDifficulty);
+if (difficultyButton) {
+  difficultyButton.addEventListener("click", cycleDifficulty);
+}
+if (helpMeButton) {
+  helpMeButton.addEventListener("click", shareHelpRequest);
+}
 speedButton.addEventListener("click", cycleSpeed);
 copyResultButton.addEventListener("click", copyShareText);
 shareResultButton.addEventListener("click", shareResult);

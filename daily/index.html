@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FlipX - Endless</title>
+  <title>FlipX - Daily</title>
 
   <style>
     :root {
@@ -469,29 +469,24 @@
   </style>
 </head>
 
-<body>
+<body data-game-mode="daily">
   <main>
     <header class="game-header">
   <div class="game-heading">
-    <h1>FlipX</h1>
-    <p class="subtitle">Make both grids into valid words.</p>
+    <h1>FlipX Daily</h1>
+    <p id="daily-details" class="subtitle">Loading today’s puzzle…</p>
   </div>
 
   <nav class="mode-nav" aria-label="Game modes">
-    <a href="/" aria-current="page">Endless</a>
-    <a href="/daily/">Daily</a>
+    <a href="/">Endless</a>
+    <a href="/daily/" aria-current="page">Daily</a>
   </nav>
 </header>
     <div class="controls">
-  <button id="new-puzzle" type="button">New puzzle</button>
+  <button id="new-puzzle" type="button">Restart today's puzzle</button>
 
-  <button
-  id="difficulty-button"
-  class="difficulty-button"
-  type="button"
-  aria-label="Difficulty: Beginner. Click to change difficulty."
->
-  Level: Beginner
+  <button id="help-me" class="difficulty-button" type="button">
+  Help Me!!
 </button>
 
 <button
@@ -573,6 +568,6 @@
 
   <div id="animation-layer" aria-hidden="true"></div>
 
-  <script src="./app.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>
