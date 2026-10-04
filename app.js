@@ -872,7 +872,7 @@ function makeShareText() {
 
   if (document.body.dataset.gameMode === "daily") {
     return [
-      `FlipX Daily #${game.dailyNumber} — ${game.difficulty.name}`,
+      `FlippinX Daily #${game.dailyNumber} — ${game.difficulty.name}`,
       `${game.moves} ${moveWord} · ${elapsedTime}`,
       "",
       "Can you make both grids into valid words?",
@@ -883,7 +883,7 @@ function makeShareText() {
   const gameUrl = window.location.origin + "/";
 
   return [
-    `I solved FlipX — ${game.difficulty.name} — in ` +
+    `I solved FlippinX — ${game.difficulty.name} — in ` +
       `${game.moves} ${moveWord} and ${elapsedTime}!`,
     "",
     "Can you make both grids into valid words?",
@@ -947,12 +947,12 @@ async function shareResult() {
   if (navigator.share) {
     try {
       await navigator.share({
-        title: "FlipX",
+        title: "FlippinX",
         text,
         url: window.location.origin + "/"
       });
 
-      copyStatusElement.textContent = "Thanks for sharing FlipX!";
+      copyStatusElement.textContent = "Thanks for sharing FlippinX!";
       return;
     } catch (error) {
       /*
@@ -1157,13 +1157,13 @@ async function shareHelpRequest() {
 
   const url = window.location.origin + "/daily/";
   const message =
-    `Help me! I'm stuck on FlipX Daily #${game.dailyNumber}. ` +
+    `Help me! I'm stuck on FlippinX Daily #${game.dailyNumber}. ` +
     "Can you solve today's puzzle?";
 
   if (navigator.share) {
     try {
       await navigator.share({
-        title: "Help me with FlipX Daily",
+        title: "Help me with FlippinX Daily",
         text: message,
         url
       });
